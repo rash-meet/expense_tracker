@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center my-4">
+    <h1 class="mb-4 fw-bold">Expense Tracker</h1>
+    <div class="row g-3 justify-content-center">
+        {% for btn in [
+            {'href': '/add_expense', 'icon': 'plus-circle', 'label': 'Add Expense', 'class': 'btn-primary'},
+            {'href': '/add_saving', 'icon': 'currency-rupee', 'label': 'Add Saving', 'class': 'btn-success'},
+            {'href': '/expense_report', 'icon': 'graph-up-arrow', 'label': 'Expense Report', 'class': 'btn-info'},
+            {'href': '/saving_report', 'icon': 'graph-down-arrow', 'label': 'Saving Report', 'class': 'btn-warning'}
+        ] %}
+        <div class="col-12 col-md-3">
+            <a href="{{ btn.href }}" class="btn {{ btn.class }} btn-lg w-100 py-3 rounded-3 shadow-sm d-flex align-items-center justify-content-center">
+                <i class="bi bi-{{ btn.icon }} me-2"></i>
+                <span>{{ btn.label }}</span>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

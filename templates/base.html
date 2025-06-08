@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Expense Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"  rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"  rel="stylesheet">
+    <style>
+        body {
+            background-color: #121212;
+            color: #f8f9fa;
+        }
+        .bg-custom { background-color: #1f1f1f; }
+        .card-dark { background-color: #1f1f1f; border: none; }
+        .form-control, .form-select {
+            background-color: #2d2d2d;
+            color: #fff;
+            border: 1px solid #444;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: #2d2d2d;
+            color: #fff;
+            border-color: #666;
+            box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
+        }
+        .table-dark {
+            --bs-table-bg: #1f1f1f;
+            --bs-table-striped-bg: #2a2a2a;
+            --bs-table-hover-bg: #333;
+        }
+        .alert-dark {
+            background-color: #2a2a2a;
+            color: #f8f9fa;
+        }
+        .btn-icon {
+            font-size: 1.2rem;
+            padding: 0.5rem 0.75rem;
+        }
+        @media (max-width: 768px) {
+            .mobile-only { display: block; }
+            .desktop-hide { display: none; }
+            .chart-container {
+                height: 300px;
+            }
+        }
+        .form-label {
+    color: white;  /* Make form labels white */
+}       
+    .card-title {
+    color: white;  /* Make form labels white */
+}
+    </style>
+</head>
+<body class="bg-dark text-white">
+    <!-- Responsive Navbar -->
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4 border-bottom border-secondary">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <i class="bi bi-wallet me-2"></i>
+                Expense Tracker
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/add_expense"><i class="bi bi-plus-circle"></i> Add Expense</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/add_saving"><i class="bi bi-currency-rupee"></i> Add Saving</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/expense_report"><i class="bi bi-graph-up-arrow"></i> Expense Report</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/saving_report"><i class="bi bi-graph-down-arrow"></i> Saving Report</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Content -->
+    <div class="container my-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script> 
+</body>
+</html>

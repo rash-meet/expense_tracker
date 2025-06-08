@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4 fw-bold">Expense Report</h2>
+
+<!-- Current Month Total -->
+<div class="alert alert-dark alert-dark mb-4">
+    Total Spent in {{ current_month }}: ₹{{ "%.2f"|format(current_month_total) }}
+</div>
+
+<!-- Filters -->
+<form method="get" class="mb-4">
+    <div class="row g-3">
+        <div class="col-md-3 col-12">
+            <label class="form-label">Month</label>
+            <select name="month" class="form-select">
+                <option value="">All Months</option>
+                {% for m in ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] %}
+                <option value="{{ m }}" {% if request.args.get('month') == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 col-12">
+            <label class="form-label">From Date</label>
+            <input type="date" name="from_date" value="{{ request.args.get('from_date') }}" class="form-control">
+        </div>
+        <div class="col-md-3 col-12">
+            <label class="form-label">To Date</label>
+            <input type="date" name="to_date" value="{{ request.args.get('to_date') }}" class="form-control">
+        </div>
+        <div class="col-md-3 col-12">
+            <label class="form-label">Category</label>
+            <select name="category" class="form-select">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if request.args.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary w-100 py-2 mt-2">
+                <i class="bi bi-funnel-fill me-2"></i> Apply Filters
+            </button>
+            <a href="/expense_report" class="btn btn-secondary w-100 py-2 mt-2">
+                <i class="bi bi-arrow-counterclockwise me-2"></i> Reset
+            </a>
+        </div>
+    </div>
+</form>
+
+<!-- Filtered Total -->
+{% if total_filtered > 0 %}
+<div class="alert alert-success mb-4">
+    Total in Filtered Results: ₹{{ "%.2f"|format(total_filtered) }}
+</div>
+{% endif %}
+
+<!-- Chart and Table -->
+<div class="row g-4">
+    <!-- Chart Section -->
+    <div class="col-12 col-md-6">
+        <img src="{{ url_for('static', filename=chart) }}" class="img-fluid rounded shadow-sm" alt="Expense Chart">
+    </div>
+
+    <!-- Expense Table -->
+    <div class="col-12 col-md-6">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle">
+                <thead class="table-secondary">
+                    <tr>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in expenses %}
+                    <tr>
+                        <td>{{ e.date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ e.category }}</td>
+                        <td>₹{{ "%.2f"|format(e.amount) }}</td>
+                        <td class="text-center">
+                            <a href="/edit_expense/{{ e._id }}" class="btn btn-sm btn-outline-warning mx-1" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="/delete_expense/{{ e._id }}" class="btn btn-sm btn-outline-danger mx-1" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr class="text-center">
+                        <td colspan="4" class="text-muted">No expenses found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

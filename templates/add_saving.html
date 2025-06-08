@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card card-dark mb-4 shadow-sm">
+    <div class="card-body">
+        <h2 class="card-title h4 mb-4 text-center">Add Saving</h2>
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Amount (₹)</label>
+                <input type="number" name="amount" step="0.01" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Saving Mode</label>
+                <select name="saving_mode" class="form-select" required>
+                    <option value="Cash">Cash</option>
+                    <option value="Bank">Bank</option>
+                    <option value="Investment">Investment</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" value="{{ current_date }}" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Note</label>
+                <input type="text" name="note" class="form-control">
+            </div>
+            <button type="submit" class="btn btn-success w-100 py-3 mt-3">
+                <i class="bi bi-save me-2"></i> Save Saving
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

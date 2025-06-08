@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card card-dark mb-4 shadow-sm">
+    <div class="card-body">
+        <h2 class="card-title h4 mb-4 text-center">Edit Expense</h2>
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Amount (₹)</label>
+                <input type="number" name="amount" value="{{ expense.amount }}" step="0.01" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Category</label>
+                <select name="category" class="form-select" required>
+                    <option value="Travel" {% if expense.category == "Travel" %}selected{% endif %}>Travel</option>
+                    <option value="Food" {% if expense.category == "Food" %}selected{% endif %}>Food</option>
+                    <option value="Shopping" {% if expense.category == "Shopping" %}selected{% endif %}>Shopping</option>
+                    <option value="Mazze" {% if expense.category == "Mazze" %}selected{% endif %}>Mazze</option>
+                    <option value="Other" {% if expense.category == "Other" %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Payment Mode</label>
+                <select name="payment_mode" class="form-select" required>
+                    <option value="UPI" {% if expense.payment_mode == "UPI" %}selected{% endif %}>UPI</option>
+                    <option value="Cash" {% if expense.payment_mode == "Cash" %}selected{% endif %}>Cash</option>
+                    <option value="Card" {% if expense.payment_mode == "Card" %}selected{% endif %}>Card</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" value="{{ expense.date_str if expense.date_str else current_date }}" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Time (Optional)</label>
+                <input type="time" name="time" value="{{ expense.time }}" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Note</label>
+                <input type="text" name="note" value="{{ expense.note }}" class="form-control">
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-3 mt-3">
+                <i class="bi bi-pencil-square me-2"></i> Update Expense
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
