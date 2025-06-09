@@ -70,6 +70,7 @@
                         <th>Date</th>
                         <th>Category</th>
                         <th>Amount</th>
+                        <th>Note</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -79,6 +80,7 @@
                         <td>{{ e.date.strftime('%Y-%m-%d') }}</td>
                         <td>{{ e.category }}</td>
                         <td>₹{{ "%.2f"|format(e.amount) }}</td>
+                        <td>{{ e.note }}</td>
                         <td class="text-center">
                             <a href="/edit_expense/{{ e._id }}" class="btn btn-sm btn-outline-warning mx-1" title="Edit">
                                 <i class="bi bi-pencil"></i>
