@@ -70,6 +70,7 @@
                         <th>Date</th>
                         <th>Mode</th>
                         <th>Amount</th>
+                        <th>Note</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -79,6 +80,7 @@
                         <td>{{ s.date.strftime('%Y-%m-%d') }}</td>
                         <td>{{ s.saving_mode }}</td>
                         <td>₹{{ "%.2f"|format(s.amount) }}</td>
+                        <td>{{ s.note }}</td>
                         <td class="text-center">
                             <a href="/edit_saving/{{ s._id }}" class="btn btn-sm btn-outline-warning mx-1" title="Edit">
                                 <i class="bi bi-pencil"></i>
