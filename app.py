@@ -11,8 +11,8 @@ from bson.objectid import ObjectId
 import pandas as pd
 from io import BytesIO
 import os
-from datetime import datetime
 
+from datetime import datetime, date, timedelta
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
 
@@ -24,6 +24,15 @@ savings = db.savings
 
 # Ensure static folder exists for charts
 os.makedirs('static', exist_ok=True)
+
+def start_of_month(dt: datetime) -> datetime:
+    return datetime(dt.year, dt.month, 1)
+
+def start_of_next_month(dt: datetime) -> datetime:
+    # if month is December, roll to January of next year
+    if dt.month == 12:
+        return datetime(dt.year + 1, 1, 1)
+    return datetime(dt.year, dt.month + 1, 1)
 
 def generate_chart(collection, group_field, chart_name):
     pipeline = [
@@ -176,15 +185,31 @@ def expense_report():
     to_date = request.args.get('to_date')
 
     # Build query dynamically
+    # if month:
+    #     try:
+    #         month_num = datetime.strptime(month, '%B').month
+    #         query['date'] = {
+    #             '$gte': datetime(datetime.now().year, month_num, 1),
+    #             '$lt': datetime(datetime.now().year, month_num + 1, 1)
+    #         }
+    #     except ValueError:
+    #         pass
     if month:
         try:
             month_num = datetime.strptime(month, '%B').month
-            query['date'] = {
-                '$gte': datetime(datetime.now().year, month_num, 1),
-                '$lt': datetime(datetime.now().year, month_num + 1, 1)
-            }
+            # build a datetime for the requested month's first day in current year
+            year = datetime.now().year
+            start = datetime(year, month_num, 1)
+            # compute next month start safely
+            if month_num == 12:
+                next_start = datetime(year + 1, 1, 1)
+            else:
+                next_start = datetime(year, month_num + 1, 1)
+    
+            query['date'] = {'$gte': start, '$lt': next_start}
         except ValueError:
             pass
+
 
     if from_date and to_date:
         query['date'] = {
@@ -206,12 +231,18 @@ def expense_report():
 
     # Calculate current month total
     current_month = datetime.now().strftime('%B')
-    current_month_query = {
-        'date': {
-            '$gte': datetime(datetime.now().year, datetime.now().month, 1),
-            '$lt': datetime(datetime.now().year, datetime.now().month + 1, 1)
-        }
-    }
+    # current_month_query = {
+    #     'date': {
+    #         '$gte': datetime(datetime.now().year, datetime.now().month, 1),
+    #         '$lt': datetime(datetime.now().year, datetime.now().month + 1, 1)
+    #     }
+    # }
+
+    now = datetime.now()
+    start = datetime(now.year, now.month, 1)
+    next_start = start_of_next_month(now)  # uses helper above
+    current_month_query = {'date': {'$gte': start, '$lt': next_start}}
+
     current_month_total = sum(e['amount'] for e in expenses.find(current_month_query))
 
     return render_template(
@@ -280,15 +311,31 @@ def saving_report():
     to_date = request.args.get('to_date')
 
     # Build query dynamically
+    # if month:
+    #     try:
+    #         month_num = datetime.strptime(month, '%B').month
+    #         query['date'] = {
+    #             '$gte': datetime(datetime.now().year, month_num, 1),
+    #             '$lt': datetime(datetime.now().year, month_num + 1, 1)
+    #         }
+    #     except ValueError:
+    #         pass
     if month:
         try:
             month_num = datetime.strptime(month, '%B').month
-            query['date'] = {
-                '$gte': datetime(datetime.now().year, month_num, 1),
-                '$lt': datetime(datetime.now().year, month_num + 1, 1)
-            }
+            # build a datetime for the requested month's first day in current year
+            year = datetime.now().year
+            start = datetime(year, month_num, 1)
+            # compute next month start safely
+            if month_num == 12:
+                next_start = datetime(year + 1, 1, 1)
+            else:
+                next_start = datetime(year, month_num + 1, 1)
+    
+            query['date'] = {'$gte': start, '$lt': next_start}
         except ValueError:
             pass
+
 
     if from_date and to_date:
         query['date'] = {
@@ -310,12 +357,17 @@ def saving_report():
 
     # Calculate current month total
     current_month = datetime.now().strftime('%B')
-    current_month_query = {
-        'date': {
-            '$gte': datetime(datetime.now().year, datetime.now().month, 1),
-            '$lt': datetime(datetime.now().year, datetime.now().month + 1, 1)
-        }
-    }
+    # current_month_query = {
+    #     'date': {
+    #         '$gte': datetime(datetime.now().year, datetime.now().month, 1),
+    #         '$lt': datetime(datetime.now().year, datetime.now().month + 1, 1)
+    #     }
+    # }
+    now = datetime.now()
+    start = datetime(now.year, now.month, 1)
+    next_start = start_of_next_month(now)  # uses helper above
+    current_month_query = {'date': {'$gte': start, '$lt': next_start}}
+
     current_month_total = sum(e['amount'] for e in savings.find(current_month_query))
     total_saved = sum(e['amount'] for e in savings.find())
 
