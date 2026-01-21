@@ -6,6 +6,8 @@
     <title>Expense Tracker</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"  rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"  rel="stylesheet">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#121212">
     <style>
         body {
             background-color: #121212;
@@ -45,14 +47,113 @@
             }
         }
         .form-label {
-    color: white;  /* Make form labels white */
-}       
-    .card-title {
-    color: white;  /* Make form labels white */
-}
+            color: white;
+        }       
+        .card-title {
+            color: white;
+        }
+        /* Toast notification styles */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 1100;
+        }
+        .toast.success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+        .toast.error {
+            background: linear-gradient(135deg, #dc3545, #ff6b6b);
+        }
+        /* Offline indicator */
+        .offline-banner {
+            display: none;
+            background: linear-gradient(135deg, #ff9800, #ff5722);
+            color: white;
+            text-align: center;
+            padding: 8px;
+            font-weight: 500;
+        }
+        .offline-banner.show {
+            display: block;
+        }
+        /* Pending sync indicator */
+        .pending-sync {
+            opacity: 0.7;
+            border-left: 3px solid #ff9800;
+        }
+        /* Connection status indicator */
+        .connection-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(30, 30, 30, 0.95);
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            z-index: 1000;
+            border: 1px solid #444;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #888;
+        }
+        .status-dot.connected {
+            background: #28a745;
+            box-shadow: 0 0 8px #28a745;
+        }
+        .status-dot.disconnected {
+            background: #dc3545;
+            box-shadow: 0 0 8px #dc3545;
+        }
+        .status-dot.checking {
+            background: #ffc107;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
     </style>
+
 </head>
 <body class="bg-dark text-white">
+    <!-- Offline Banner -->
+    <div class="offline-banner" id="offlineBanner">
+        <i class="bi bi-wifi-off me-2"></i> You're offline. Changes will sync when connected.
+    </div>
+
+    <!-- Backend Connection Status -->
+    <div class="connection-status" id="connectionStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Checking...</span>
+    </div>
+
+
+    <!-- Toast Container for Notifications -->
+    <div class="toast-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="toast align-items-center text-white {{ category }} border-0 show" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="bi {{ 'bi-check-circle' if category == 'success' else 'bi-exclamation-circle' }} me-2"></i>
+                            {{ message }}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
     <!-- Responsive Navbar -->
     <nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4 border-bottom border-secondary">
         <div class="container">
@@ -81,6 +182,83 @@
     </div>
 
     <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Auto-dismiss toasts after 4 seconds -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-dismiss toasts
+            const toasts = document.querySelectorAll('.toast.show');
+            toasts.forEach(function(toast) {
+                setTimeout(function() {
+                    toast.classList.remove('show');
+                    toast.remove();
+                }, 4000);
+            });
+
+            // Offline detection
+            function updateOnlineStatus() {
+                const banner = document.getElementById('offlineBanner');
+                if (!navigator.onLine) {
+                    banner.classList.add('show');
+                    updateConnectionStatus('disconnected', 'Offline');
+                } else {
+                    banner.classList.remove('show');
+                    checkBackendHealth();
+                }
+            }
+            window.addEventListener('online', updateOnlineStatus);
+            window.addEventListener('offline', updateOnlineStatus);
+            updateOnlineStatus();
+
+            // Backend health check
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            function updateConnectionStatus(status, text) {
+                statusDot.className = 'status-dot ' + status;
+                statusText.textContent = text;
+            }
+
+            async function checkBackendHealth() {
+                updateConnectionStatus('checking', 'Checking...');
+                
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    
+                    const response = await fetch('/api/health', {
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.status === 'connected') {
+                            updateConnectionStatus('connected', 'Connected');
+                        } else {
+                            updateConnectionStatus('disconnected', 'DB Error');
+                        }
+                    } else {
+                        updateConnectionStatus('disconnected', 'Server Error');
+                    }
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        updateConnectionStatus('disconnected', 'Timeout');
+                    } else {
+                        updateConnectionStatus('disconnected', 'Disconnected');
+                    }
+                }
+            }
+
+            // Check health every 30 seconds
+            checkBackendHealth();
+            setInterval(checkBackendHealth, 30000);
+        });
+    </script>
+    
+    <!-- Offline Support -->
+    <script src="/static/offline.js"></script>
 </body>
 </html>
+

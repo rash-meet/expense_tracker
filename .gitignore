@@ -1,9 +1,38 @@
-__pycache__
-*.pyc
-*.db
-*.log
-*.env
-/static/*.png  # Ignore generated charts
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
 /env/
 /venv/
 /myenv/
+.venv/
+
+# Environment variables
+.env
+*.env
+
+# Database connection check (contains credentials)
+con_check.py
+
+# Generated files
+/static/*.png
+*.log
+*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Distribution
+dist/
+build/
+*.egg-info/

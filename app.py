@@ -5,14 +5,35 @@ import matplotlib
 matplotlib.use('Agg')  # 👈 Important! Must be before importing pyplot
 import matplotlib.pyplot as plt
 
-from flask import Flask, render_template, request, redirect, url_for, send_file
+from dotenv import load_dotenv
+load_dotenv()
+
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import pandas as pd
 from io import BytesIO
 import os
+import pytz
 
 from datetime import datetime, date, timedelta
+
+# IST Timezone
+IST = pytz.timezone('Asia/Kolkata')
+
+def get_ist_now():
+    """Get current datetime in IST"""
+    return datetime.now(IST)
+
+def to_ist(dt):
+    """Convert datetime to IST for display"""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        # Assume UTC if naive
+        dt = pytz.utc.localize(dt)
+    return dt.astimezone(IST)
+
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
 
@@ -22,8 +43,14 @@ db = client.expense_tracker
 expenses = db.expenses
 savings = db.savings
 
+# Register API blueprint for offline sync
+from api import api, init_api
+init_api(expenses, savings)
+app.register_blueprint(api)
+
 # Ensure static folder exists for charts
 os.makedirs('static', exist_ok=True)
+
 
 def start_of_month(dt: datetime) -> datetime:
     return datetime(dt.year, dt.month, 1)
@@ -113,58 +140,75 @@ def index():
 # === EXPENSES ===
 @app.route('/add_expense', methods=['GET', 'POST'])
 def add_expense():
-    current_date = datetime.now().strftime('%Y-%m-%d')
+    current_date = get_ist_now().strftime('%Y-%m-%d')
     if request.method == 'POST':
-        amount = float(request.form['amount'])
-        category = request.form['category']
-        payment_mode = request.form['payment_mode']
-        date = datetime.strptime(request.form['date'], '%Y-%m-%d')
-        time = request.form.get('time', '').strip()  # Get and clean time input
+        try:
+            amount = float(request.form['amount'])
+            category = request.form['category']
+            payment_mode = request.form['payment_mode']
+            date = datetime.strptime(request.form['date'], '%Y-%m-%d')
+            time = request.form.get('time', '').strip()
 
-        # If no time is provided, use current system time
-        if not time:
-            time = datetime.now().strftime('%H:%M')  # Format as HH:MM
+            # If no time is provided, use current IST time
+            if not time:
+                time = get_ist_now().strftime('%H:%M')
 
-        note = request.form.get('note', '')
+            note = request.form.get('note', '')
 
-        data = {
-            'amount': amount,
-            'category': category,
-            'payment_mode': payment_mode,
-            'date': date,
-            'time': time,
-            'note': note
-        }
+            data = {
+                'amount': amount,
+                'category': category,
+                'payment_mode': payment_mode,
+                'date': date,
+                'time': time,
+                'note': note
+            }
 
-        expenses.insert_one(data)
-        return redirect(url_for('index'))
+            expenses.insert_one(data)
+            flash('Expense added successfully!', 'success')
+            return redirect(url_for('add_expense'))
+
+        except Exception as e:
+            flash(f'Error adding expense: {str(e)}', 'error')
+            return redirect(url_for('add_expense'))
 
     return render_template('add_expense.html', current_date=current_date)
+
 
 @app.route('/edit_expense/<id>', methods=['GET', 'POST'])
 def edit_expense(id):
     exp = expenses.find_one({'_id': ObjectId(id)})
     exp['date_str'] = exp['date'].strftime('%Y-%m-%d')
-    current_date = datetime.now().strftime('%Y-%m-%d')
+    current_date = get_ist_now().strftime('%Y-%m-%d')
 
     if request.method == 'POST':
-        updated = {
-            'amount': float(request.form['amount']),
-            'category': request.form['category'],
-            'payment_mode': request.form['payment_mode'],
-            'date': datetime.strptime(request.form['date'], '%Y-%m-%d'),
-            'time': request.form.get('time', ''),
-            'note': request.form.get('note', '')
-        }
-        expenses.update_one({'_id': ObjectId(id)}, {'$set': updated})
-        return redirect(url_for('index'))
+        try:
+            updated = {
+                'amount': float(request.form['amount']),
+                'category': request.form['category'],
+                'payment_mode': request.form['payment_mode'],
+                'date': datetime.strptime(request.form['date'], '%Y-%m-%d'),
+                'time': request.form.get('time', ''),
+                'note': request.form.get('note', '')
+            }
+            expenses.update_one({'_id': ObjectId(id)}, {'$set': updated})
+            flash('Expense updated successfully!', 'success')
+            return redirect(url_for('expense_report'))
+        except Exception as e:
+            flash(f'Error updating expense: {str(e)}', 'error')
+            return redirect(url_for('edit_expense', id=id))
 
     return render_template('edit_expense.html', expense=exp, current_date=current_date)
 
 @app.route('/delete_expense/<id>')
 def delete_expense(id):
-    expenses.delete_one({'_id': ObjectId(id)})
-    return redirect(url_for('index'))
+    try:
+        expenses.delete_one({'_id': ObjectId(id)})
+        flash('Expense deleted successfully!', 'success')
+    except Exception as e:
+        flash(f'Error deleting expense: {str(e)}', 'error')
+    return redirect(url_for('expense_report'))
+
 
 # @app.route('/expense_report')
 # def expense_report():
@@ -172,45 +216,40 @@ def delete_expense(id):
 #     generate_chart(expenses, 'category', 'expense_chart')
 #     return render_template('expense_report.html', expenses=all_expenses, chart='expense_chart.png')
 
-# 
 @app.route('/expense_report')
 def expense_report():
-    from datetime import datetime
-
     query = {}
 
     month = request.args.get('month')
+    year = request.args.get('year')
     category = request.args.get('category')
+    payment_mode = request.args.get('payment_mode')
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
 
-    # Build query dynamically
-    # if month:
-    #     try:
-    #         month_num = datetime.strptime(month, '%B').month
-    #         query['date'] = {
-    #             '$gte': datetime(datetime.now().year, month_num, 1),
-    #             '$lt': datetime(datetime.now().year, month_num + 1, 1)
-    #         }
-    #     except ValueError:
-    #         pass
+    # Build year list for dropdown (last 5 years)
+    current_year = get_ist_now().year
+    years_list = list(range(current_year, current_year - 5, -1))
+
+    # Default year to current if month selected but year not specified
+    if month and not year:
+        year = str(current_year)
+
+    # Month + Year filter
     if month:
         try:
             month_num = datetime.strptime(month, '%B').month
-            # build a datetime for the requested month's first day in current year
-            year = datetime.now().year
-            start = datetime(year, month_num, 1)
-            # compute next month start safely
+            selected_year = int(year) if year else current_year
+            start = datetime(selected_year, month_num, 1)
             if month_num == 12:
-                next_start = datetime(year + 1, 1, 1)
+                next_start = datetime(selected_year + 1, 1, 1)
             else:
-                next_start = datetime(year, month_num + 1, 1)
-    
+                next_start = datetime(selected_year, month_num + 1, 1)
             query['date'] = {'$gte': start, '$lt': next_start}
         except ValueError:
             pass
 
-
+    # Date range filter (overrides month filter if both provided)
     if from_date and to_date:
         query['date'] = {
             '$gte': datetime.strptime(from_date, '%Y-%m-%d'),
@@ -220,29 +259,25 @@ def expense_report():
     if category:
         query['category'] = category
 
+    if payment_mode:
+        query['payment_mode'] = payment_mode
+
     # Fetch filtered expenses
     filtered_expenses = list(expenses.find(query).sort([("date", -1), ("time", -1)]))
     total_filtered = sum(e['amount'] for e in filtered_expenses)
 
     categories = expenses.distinct('category')
+    payment_modes = expenses.distinct('payment_mode')
 
     # Generate pie chart with filtered query
     generate_pie_chart(expenses, 'category', 'expense_chart', query)
 
     # Calculate current month total
-    current_month = datetime.now().strftime('%B')
-    # current_month_query = {
-    #     'date': {
-    #         '$gte': datetime(datetime.now().year, datetime.now().month, 1),
-    #         '$lt': datetime(datetime.now().year, datetime.now().month + 1, 1)
-    #     }
-    # }
-
-    now = datetime.now()
+    now = get_ist_now()
+    current_month = now.strftime('%B')
     start = datetime(now.year, now.month, 1)
-    next_start = start_of_next_month(now)  # uses helper above
+    next_start = start_of_next_month(now)
     current_month_query = {'date': {'$gte': start, '$lt': next_start}}
-
     current_month_total = sum(e['amount'] for e in expenses.find(current_month_query))
 
     return render_template(
@@ -250,93 +285,112 @@ def expense_report():
         expenses=filtered_expenses,
         chart='expense_chart.png',
         categories=categories,
+        payment_modes=payment_modes,
         current_month=current_month,
         current_month_total=current_month_total,
-        total_filtered=total_filtered
+        total_filtered=total_filtered,
+        years_list=years_list,
+        selected_year=year
     )
+
 # === SAVINGS ===
 @app.route('/add_saving', methods=['GET', 'POST'])
 def add_saving():
-    current_date = datetime.now().strftime('%Y-%m-%d')
+    current_date = get_ist_now().strftime('%Y-%m-%d')
     if request.method == 'POST':
-        amount = float(request.form['amount'])
-        saving_mode = request.form['saving_mode']
-        date = datetime.strptime(request.form['date'], '%Y-%m-%d')
-        note = request.form.get('note', '')
+        try:
+            amount = float(request.form['amount'])
+            saving_mode = request.form['saving_mode']
+            date = datetime.strptime(request.form['date'], '%Y-%m-%d')
+            time = request.form.get('time', '').strip()
+            if not time:
+                time = get_ist_now().strftime('%H:%M')
+            note = request.form.get('note', '')
 
-        data = {
-            'amount': amount,
-            'saving_mode': saving_mode,
-            'date': date,
-            'note': note
-        }
+            data = {
+                'amount': amount,
+                'saving_mode': saving_mode,
+                'date': date,
+                'time': time,
+                'note': note
+            }
 
-        savings.insert_one(data)
-        return redirect(url_for('index'))
+            savings.insert_one(data)
+            flash('Saving added successfully!', 'success')
+            return redirect(url_for('saving_report'))
+        except Exception as e:
+            flash(f'Error adding saving: {str(e)}', 'error')
+            return redirect(url_for('add_saving'))
 
     return render_template('add_saving.html', current_date=current_date)
 
 
 @app.route('/edit_saving/<id>', methods=['GET', 'POST'])
 def edit_saving(id):
-    from bson.objectid import ObjectId
     saving = savings.find_one({'_id': ObjectId(id)})
     
     if request.method == 'POST':
-        updated = {
-            'amount': float(request.form['amount']),
-            'saving_mode': request.form['saving_mode'],
-            'date': datetime.strptime(request.form['date'], '%Y-%m-%d'),
-            'note': request.form.get('note', '')
-        }
-        savings.update_one({'_id': ObjectId(id)}, {'$set': updated})
-        return redirect(url_for('index'))
+        try:
+            updated = {
+                'amount': float(request.form['amount']),
+                'saving_mode': request.form['saving_mode'],
+                'date': datetime.strptime(request.form['date'], '%Y-%m-%d'),
+                'time': request.form.get('time', ''),
+                'note': request.form.get('note', '')
+            }
+            savings.update_one({'_id': ObjectId(id)}, {'$set': updated})
+            flash('Saving updated successfully!', 'success')
+            return redirect(url_for('saving_report'))
+        except Exception as e:
+            flash(f'Error updating saving: {str(e)}', 'error')
+            return redirect(url_for('edit_saving', id=id))
 
     saving['date_str'] = saving['date'].strftime('%Y-%m-%d')
     return render_template('edit_saving.html', saving=saving)
 
 @app.route('/delete_saving/<id>')
 def delete_saving(id):
-    savings.delete_one({'_id': ObjectId(id)})
-    return redirect(url_for('index'))
+    try:
+        savings.delete_one({'_id': ObjectId(id)})
+        flash('Saving deleted successfully!', 'success')
+    except Exception as e:
+        flash(f'Error deleting saving: {str(e)}', 'error')
+    return redirect(url_for('saving_report'))
+
+
 @app.route('/saving_report')
 def saving_report():
-    from datetime import datetime
-
     query = {}
 
     month = request.args.get('month')
+    year = request.args.get('year')
     mode = request.args.get('saving_mode')
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
 
-    # Build query dynamically
-    # if month:
-    #     try:
-    #         month_num = datetime.strptime(month, '%B').month
-    #         query['date'] = {
-    #             '$gte': datetime(datetime.now().year, month_num, 1),
-    #             '$lt': datetime(datetime.now().year, month_num + 1, 1)
-    #         }
-    #     except ValueError:
-    #         pass
+    # Build year list for dropdown (last 5 years)
+    current_year = get_ist_now().year
+    years_list = list(range(current_year, current_year - 5, -1))
+
+    # Default year to current if month selected but year not specified
+    if month and not year:
+        year = str(current_year)
+
+    # Month + Year filter
     if month:
         try:
             month_num = datetime.strptime(month, '%B').month
-            # build a datetime for the requested month's first day in current year
-            year = datetime.now().year
-            start = datetime(year, month_num, 1)
-            # compute next month start safely
+            selected_year = int(year) if year else current_year
+            start = datetime(selected_year, month_num, 1)
             if month_num == 12:
-                next_start = datetime(year + 1, 1, 1)
+                next_start = datetime(selected_year + 1, 1, 1)
             else:
-                next_start = datetime(year, month_num + 1, 1)
-    
+                next_start = datetime(selected_year, month_num + 1, 1)
             query['date'] = {'$gte': start, '$lt': next_start}
         except ValueError:
             pass
 
-
+    # Date range filter (overrides month filter if both provided)
     if from_date and to_date:
         query['date'] = {
             '$gte': datetime.strptime(from_date, '%Y-%m-%d'),
@@ -356,16 +410,10 @@ def saving_report():
     generate_pie_chart(savings, 'saving_mode', 'saving_chart', query)
 
     # Calculate current month total
-    current_month = datetime.now().strftime('%B')
-    # current_month_query = {
-    #     'date': {
-    #         '$gte': datetime(datetime.now().year, datetime.now().month, 1),
-    #         '$lt': datetime(datetime.now().year, datetime.now().month + 1, 1)
-    #     }
-    # }
-    now = datetime.now()
+    now = get_ist_now()
+    current_month = now.strftime('%B')
     start = datetime(now.year, now.month, 1)
-    next_start = start_of_next_month(now)  # uses helper above
+    next_start = start_of_next_month(now)
     current_month_query = {'date': {'$gte': start, '$lt': next_start}}
 
     current_month_total = sum(e['amount'] for e in savings.find(current_month_query))
@@ -379,8 +427,12 @@ def saving_report():
         current_month=current_month,
         current_month_total=current_month_total,
         total_filtered=total_filtered,
-        total_saved=total_saved
+        total_saved=total_saved,
+        years_list=years_list,
+        selected_year=year
     )
+
+
 # @app.route('/')
 # def index():
 #     return render_template('index.html')
