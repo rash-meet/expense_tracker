@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/* Dark theme - matching original Flask app */
+body {
+  background-color: #121212 !important;
+  color: #f8f9fa !important;
+}
+
+.bg-custom {
+  background-color: #1f1f1f !important;
+}
+
+.card-dark {
+  background-color: #1f1f1f !important;
+  border: none !important;
+}
+
+/* Force dark theme on all form inputs */
+.form-control,
+.form-select,
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="password"],
+input[type="email"],
+select,
+textarea {
+  background-color: #2d2d2d !important;
+  color: #fff !important;
+  border: 1px solid #444 !important;
+}
+
+.form-control:focus,
+.form-select:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  background-color: #2d2d2d !important;
+  color: #fff !important;
+  border-color: #666 !important;
+  box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25) !important;
+}
+
+/* Fix date and time input icons */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Fix select dropdown arrow */
+.form-select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+
+/* Table styles */
+.table-dark {
+  --bs-table-bg: #1f1f1f;
+  --bs-table-striped-bg: #2a2a2a;
+  --bs-table-hover-bg: #333;
+}
+
+.alert-dark {
+  background-color: #2a2a2a !important;
+  color: #f8f9fa !important;
+}
+
+.form-label {
+  color: white !important;
+}
+
+.card-title {
+  color: white !important;
+}
+
+/* Navbar styling */
+.navbar {
+  background-color: #212529 !important;
+}
+
+.navbar-toggler {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
+}
+
+/* Offline indicator */
+.offline-banner {
+  display: none;
+  background: linear-gradient(135deg, #ff9800, #ff5722);
+  color: white;
+  text-align: center;
+  padding: 8px;
+  font-weight: 500;
+}
+
+.offline-banner.show {
+  display: block;
+}
+
+/* Connection status indicator */
+.connection-status {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(30, 30, 30, 0.95);
+  padding: 8px 16px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  z-index: 1000;
+  border: 1px solid #444;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #888;
+}
+
+.status-dot.connected {
+  background: #28a745;
+  box-shadow: 0 0 8px #28a745;
+}
+
+.status-dot.disconnected {
+  background: #dc3545;
+  box-shadow: 0 0 8px #dc3545;
+}
+
+.status-dot.checking {
+  background: #ffc107;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Pending sync indicator */
+.pending-sync {
+  opacity: 0.7;
+  border-left: 3px solid #ff9800;
+}
+
+/* Input group styling */
+.input-group-text {
+  background-color: #1f1f1f !important;
+  color: #fff !important;
+  border: 1px solid #444 !important;
+}
