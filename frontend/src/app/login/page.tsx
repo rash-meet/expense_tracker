@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { login } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
-export default function LoginPage() {
+function LoginForm() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -129,5 +129,13 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="min-vh-100 d-flex align-items-center justify-content-center bg-dark text-white">Loading...</div>}>
+            <LoginForm />
+        </Suspense>
     );
 }
