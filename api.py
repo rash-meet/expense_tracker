@@ -1,9 +1,12 @@
-# api.py - REST API endpoints for PWA offline sync
+# api.py - REST API endpoints for PWA offline sync with JWT Authentication
 
 from flask import Blueprint, jsonify, request
 from bson.objectid import ObjectId
-from datetime import datetime
+from datetime import datetime, timedelta
+from functools import wraps
 import pytz
+import jwt
+import os
 
 IST = pytz.timezone('Asia/Kolkata')
 
@@ -13,10 +16,106 @@ api = Blueprint('api', __name__, url_prefix='/api')
 expenses_collection = None
 savings_collection = None
 
+# Auth config - loaded from environment
+AUTH_USERNAME = None
+AUTH_PASSWORD = None
+JWT_SECRET = None
+
 def init_api(expenses, savings):
     global expenses_collection, savings_collection
+    global AUTH_USERNAME, AUTH_PASSWORD, JWT_SECRET
+    
     expenses_collection = expenses
     savings_collection = savings
+    
+    # Load auth config
+    AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
+    AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "changeme")
+    JWT_SECRET = os.getenv("JWT_SECRET", "jwt-secret-key-change-in-production")
+
+
+# ==================== AUTHENTICATION ====================
+
+def require_auth(f):
+    """Decorator to require JWT authentication for API endpoints"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        
+        # Check for token in Authorization header
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) == 2 and parts[0].lower() == 'bearer':
+                token = parts[1]
+        
+        if not token:
+            return jsonify({'error': 'Authentication required', 'code': 'NO_TOKEN'}), 401
+        
+        try:
+            # Decode and verify the token
+            payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+            request.user = payload.get('sub')
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired', 'code': 'TOKEN_EXPIRED'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token', 'code': 'INVALID_TOKEN'}), 401
+        
+        return f(*args, **kwargs)
+    return decorated
+
+
+@api.route('/login', methods=['POST'])
+def login():
+    """Login endpoint - returns JWT token on successful authentication"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'Missing request body'}), 400
+        
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        
+        if not username or not password:
+            return jsonify({'error': 'Username and password required'}), 400
+        
+        # Validate credentials
+        if username == AUTH_USERNAME and password == AUTH_PASSWORD:
+            # Generate JWT token with 4-hour expiry
+            expiry_time = datetime.utcnow() + timedelta(hours=4)
+            
+            token = jwt.encode({
+                'sub': username,
+                'iat': datetime.utcnow(),
+                'exp': expiry_time
+            }, JWT_SECRET, algorithm='HS256')
+            
+            return jsonify({
+                'success': True,
+                'token': token,
+                'expires_at': expiry_time.isoformat() + 'Z',
+                'expires_in': 14400  # 4 hours in seconds
+            })
+        
+        return jsonify({'error': 'Invalid credentials'}), 401
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api.route('/verify', methods=['GET'])
+@require_auth
+def verify_token():
+    """Verify if the current token is valid"""
+    return jsonify({
+        'valid': True,
+        'user': request.user,
+        'timestamp': datetime.now(IST).isoformat()
+    })
+
+
+# ==================== HEALTH CHECK ====================
 
 @api.route('/health', methods=['GET'])
 def health_check():
@@ -36,36 +135,59 @@ def health_check():
             'error': str(e)
         }), 503
 
-@api.route('/expenses', methods=['GET'])
-def get_expenses():
-    """Get expenses with optional date range filtering"""
 
+# ==================== EXPENSES API ====================
+
+@api.route('/expenses', methods=['GET'])
+@require_auth
+def get_expenses():
+    """Get expenses with optional date range filtering and pagination"""
     try:
         query = {}
         from_date = request.args.get('from_date')
         to_date = request.args.get('to_date')
-        limit = request.args.get('limit', 100, type=int)
+        category = request.args.get('category')
+        payment_mode = request.args.get('payment_mode')
         
+        # Filters
         if from_date:
-            query['date'] = {'$gte': datetime.strptime(from_date, '%Y-%m-%d')}
+            query.setdefault('date', {})['$gte'] = datetime.strptime(from_date, '%Y-%m-%d')
         if to_date:
-            if 'date' in query:
-                query['date']['$lte'] = datetime.strptime(to_date, '%Y-%m-%d')
-            else:
-                query['date'] = {'$lte': datetime.strptime(to_date, '%Y-%m-%d')}
+            query.setdefault('date', {})['$lte'] = datetime.strptime(to_date, '%Y-%m-%d')
+        if category:
+            query['category'] = category
+        if payment_mode:
+            query['payment_mode'] = payment_mode
+            
+        # Pagination
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 50, type=int)
+        skip = (page - 1) * limit
         
-        expenses = list(expenses_collection.find(query).sort('date', -1).limit(limit))
+        total_count = expenses_collection.count_documents(query)
+        expenses = list(expenses_collection.find(query).sort('date', -1).skip(skip).limit(limit))
         
         # Convert ObjectId and datetime to string for JSON
         for exp in expenses:
             exp['_id'] = str(exp['_id'])
             exp['date'] = exp['date'].strftime('%Y-%m-%d')
         
-        return jsonify({'success': True, 'data': expenses})
+        return jsonify({
+            'success': True, 
+            'data': expenses,
+            'pagination': {
+                'page': page,
+                'limit': limit,
+                'total': total_count,
+                'pages': (total_count + limit - 1) // limit
+            }
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
 @api.route('/expenses', methods=['POST'])
+@require_auth
 def add_expense():
     """Add a new expense"""
     try:
@@ -85,34 +207,99 @@ def add_expense():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@api.route('/expenses/<id>', methods=['PUT'])
+@require_auth
+def update_expense(id):
+    """Update an existing expense"""
+    try:
+        data = request.get_json()
+        
+        updated = {
+            'amount': float(data['amount']),
+            'category': data['category'],
+            'payment_mode': data.get('payment_mode', 'Cash'),
+            'date': datetime.strptime(data['date'], '%Y-%m-%d'),
+            'time': data.get('time', ''),
+            'note': data.get('note', '')
+        }
+        
+        result = expenses_collection.update_one(
+            {'_id': ObjectId(id)}, 
+            {'$set': updated}
+        )
+        
+        if result.matched_count == 0:
+            return jsonify({'success': False, 'error': 'Expense not found'}), 404
+        
+        return jsonify({'success': True, 'modified': result.modified_count})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api.route('/expenses/<id>', methods=['DELETE'])
+@require_auth
+def delete_expense(id):
+    """Delete an expense"""
+    try:
+        result = expenses_collection.delete_one({'_id': ObjectId(id)})
+        
+        if result.deleted_count == 0:
+            return jsonify({'success': False, 'error': 'Expense not found'}), 404
+        
+        return jsonify({'success': True, 'deleted': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== SAVINGS API ====================
+
 @api.route('/savings', methods=['GET'])
+@require_auth
 def get_savings():
-    """Get savings with optional date range filtering"""
+    """Get savings with optional date range filtering and pagination"""
     try:
         query = {}
         from_date = request.args.get('from_date')
         to_date = request.args.get('to_date')
-        limit = request.args.get('limit', 100, type=int)
+        mode = request.args.get('saving_mode')
         
+        # Filters
         if from_date:
-            query['date'] = {'$gte': datetime.strptime(from_date, '%Y-%m-%d')}
+            query.setdefault('date', {})['$gte'] = datetime.strptime(from_date, '%Y-%m-%d')
         if to_date:
-            if 'date' in query:
-                query['date']['$lte'] = datetime.strptime(to_date, '%Y-%m-%d')
-            else:
-                query['date'] = {'$lte': datetime.strptime(to_date, '%Y-%m-%d')}
+            query.setdefault('date', {})['$lte'] = datetime.strptime(to_date, '%Y-%m-%d')
+        if mode:
+            query['saving_mode'] = mode
+            
+        # Pagination
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 50, type=int)
+        skip = (page - 1) * limit
         
-        savings = list(savings_collection.find(query).sort('date', -1).limit(limit))
+        total_count = savings_collection.count_documents(query)
+        savings = list(savings_collection.find(query).sort('date', -1).skip(skip).limit(limit))
         
         for sav in savings:
             sav['_id'] = str(sav['_id'])
             sav['date'] = sav['date'].strftime('%Y-%m-%d')
         
-        return jsonify({'success': True, 'data': savings})
+        return jsonify({
+            'success': True, 
+            'data': savings,
+            'pagination': {
+                'page': page,
+                'limit': limit,
+                'total': total_count,
+                'pages': (total_count + limit - 1) // limit
+            }
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
 @api.route('/savings', methods=['POST'])
+@require_auth
 def add_saving():
     """Add a new saving"""
     try:
@@ -131,7 +318,54 @@ def add_saving():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@api.route('/savings/<id>', methods=['PUT'])
+@require_auth
+def update_saving(id):
+    """Update an existing saving"""
+    try:
+        data = request.get_json()
+        
+        updated = {
+            'amount': float(data['amount']),
+            'saving_mode': data['saving_mode'],
+            'date': datetime.strptime(data['date'], '%Y-%m-%d'),
+            'time': data.get('time', ''),
+            'note': data.get('note', '')
+        }
+        
+        result = savings_collection.update_one(
+            {'_id': ObjectId(id)}, 
+            {'$set': updated}
+        )
+        
+        if result.matched_count == 0:
+            return jsonify({'success': False, 'error': 'Saving not found'}), 404
+        
+        return jsonify({'success': True, 'modified': result.modified_count})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api.route('/savings/<id>', methods=['DELETE'])
+@require_auth
+def delete_saving(id):
+    """Delete a saving"""
+    try:
+        result = savings_collection.delete_one({'_id': ObjectId(id)})
+        
+        if result.deleted_count == 0:
+            return jsonify({'success': False, 'error': 'Saving not found'}), 404
+        
+        return jsonify({'success': True, 'deleted': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== SYNC API ====================
+
 @api.route('/sync', methods=['POST'])
+@require_auth
 def bulk_sync():
     """Bulk sync endpoint for syncing multiple items at once"""
     try:
@@ -170,5 +404,109 @@ def bulk_sync():
                 results['savings'].append({'success': False, 'error': str(e)})
         
         return jsonify({'success': True, 'results': results})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api.route('/delete-bulk', methods=['POST'])
+@require_auth
+def delete_bulk():
+    """Bulk delete data based on filters, protected by password"""
+    try:
+        data = request.get_json()
+        password = data.get('password')
+        filters = data.get('filters', {})
+        collection_type = data.get('type')  # 'expense' or 'saving'
+        
+        # 1. Password Verification
+        if password != AUTH_PASSWORD:
+            return jsonify({'success': False, 'error': 'Incorrect password'}), 403
+            
+        # 2. Select Collection
+        if collection_type == 'expense':
+            collection = expenses_collection
+        elif collection_type == 'saving':
+            collection = savings_collection
+        else:
+            return jsonify({'success': False, 'error': 'Invalid type'}), 400
+            
+        # 3. Build Query
+        query = {}
+        if filters.get('from_date'):
+            query.setdefault('date', {})['$gte'] = datetime.strptime(filters['from_date'], '%Y-%m-%d')
+        if filters.get('to_date'):
+            query.setdefault('date', {})['$lte'] = datetime.strptime(filters['to_date'], '%Y-%m-%d')
+            
+        if collection_type == 'expense':
+            if filters.get('category'):
+                query['category'] = filters['category']
+            if filters.get('payment_mode'):
+                query['payment_mode'] = filters['payment_mode']
+        else:
+            if filters.get('saving_mode'):
+                query['saving_mode'] = filters['saving_mode']
+                
+        # 4. Filter empty/danger check (Prevent deleting EVERYTHING unless explicitly requested with no filters??
+        # Actually, user might want to delete everything. Let's just trust filter is intentional.)
+        # If no filters provided, it deletes EVERYTHING in that collection.
+        
+        # 5. Execute Delete
+        result = collection.delete_many(query)
+        
+        return jsonify({
+            'success': True, 
+            'deleted_count': result.deleted_count,
+            'message': f"Successfully deleted {result.deleted_count} records."
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== STATISTICS API ====================
+
+@api.route('/stats', methods=['GET'])
+@require_auth
+def get_stats():
+    """Get expense and savings statistics"""
+    try:
+        from datetime import date
+        
+        # Current month boundaries
+        today = datetime.now(IST)
+        start_of_month = datetime(today.year, today.month, 1)
+        if today.month == 12:
+            end_of_month = datetime(today.year + 1, 1, 1)
+        else:
+            end_of_month = datetime(today.year, today.month + 1, 1)
+        
+        month_query = {'date': {'$gte': start_of_month, '$lt': end_of_month}}
+        
+        # Calculate totals
+        all_expenses = list(expenses_collection.find())
+        all_savings = list(savings_collection.find())
+        month_expenses = list(expenses_collection.find(month_query))
+        month_savings = list(savings_collection.find(month_query))
+        
+        # Get distinct categories and modes
+        categories = expenses_collection.distinct('category')
+        payment_modes = expenses_collection.distinct('payment_mode')
+        saving_modes = savings_collection.distinct('saving_mode')
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_expenses': sum(e['amount'] for e in all_expenses),
+                'total_savings': sum(s['amount'] for s in all_savings),
+                'month_expenses': sum(e['amount'] for e in month_expenses),
+                'month_savings': sum(s['amount'] for s in month_savings),
+                'expense_count': len(all_expenses),
+                'savings_count': len(all_savings),
+                'categories': categories,
+                'payment_modes': payment_modes,
+                'saving_modes': saving_modes,
+                'current_month': today.strftime('%B %Y')
+            }
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

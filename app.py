@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
+from flask_cors import CORS
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import pandas as pd
@@ -36,6 +37,17 @@ def to_ist(dt):
 
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
+
+# Enable CORS for frontend origin
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [frontend_url, "http://localhost:3000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
 
 # MongoDB Setup
 client = MongoClient(app.config['MONGO_URI'])

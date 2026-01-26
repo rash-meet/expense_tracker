@@ -6,3 +6,5 @@ matplotlib
 gunicorn
 python-dotenv
 pytz
+PyJWT
+flask-cors
