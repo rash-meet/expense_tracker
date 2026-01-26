@@ -18,7 +18,7 @@ export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
-            router.replace('/login');
+            router.replace('/login?expired=true');
         }
     }, [isAuthenticated, isLoading, router]);
 

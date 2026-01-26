@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { login } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -12,7 +12,11 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { checkAuth } = useAuth();
+
+    // Check for expired session param
+    const isExpired = searchParams.get('expired') === 'true';
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,6 +48,13 @@ export default function LoginPage() {
 
                         <div className="card card-dark shadow" style={{ backgroundColor: '#1f1f1f', border: 'none' }}>
                             <div className="card-body p-4">
+                                {isExpired && !error && (
+                                    <div className="alert alert-warning d-flex align-items-center" role="alert">
+                                        <i className="bi bi-clock-history me-2"></i>
+                                        <div>Session expired. Please sign in again.</div>
+                                    </div>
+                                )}
+
                                 {error && (
                                     <div className="alert alert-danger d-flex align-items-center" role="alert">
                                         <i className="bi bi-exclamation-triangle-fill me-2"></i>

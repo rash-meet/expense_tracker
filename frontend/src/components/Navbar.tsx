@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 
 export default function Navbar() {
-    const { logout } = useAuth();
+    const { logout, daysLeft } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
 
     const toggleMenu = () => {
@@ -45,6 +45,10 @@ export default function Navbar() {
                                 <i className={`bi ${item.icon} me-1`}></i> {item.label}
                             </Link>
                         ))}
+                        <div className="d-flex align-items-center text-muted small me-2" title="Days until session expires">
+                            <i className="bi bi-clock-history me-1"></i>
+                            {daysLeft !== null ? `${daysLeft}d left` : ''}
+                        </div>
                         <button
                             className="btn btn-link text-danger text-decoration-none p-0"
                             onClick={logout}
@@ -99,6 +103,11 @@ export default function Navbar() {
                         >
                             <i className="bi bi-box-arrow-right me-2"></i> Logout
                         </button>
+                        {daysLeft !== null && (
+                            <div className="text-secondary small mt-3 text-center border-top border-secondary pt-2">
+                                <i className="bi bi-clock-history me-1"></i> Session expires in {daysLeft} days
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

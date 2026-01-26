@@ -6,6 +6,8 @@ import { isTokenValid, clearToken } from '@/lib/api';
 interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
+    expiresAt: number | null;
+    daysLeft: number | null;
     checkAuth: () => void;
     logout: () => void;
 }
@@ -15,16 +17,33 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [expiresAt, setExpiresAt] = useState<number | null>(null);
+    const [daysLeft, setDaysLeft] = useState<number | null>(null);
 
     const checkAuth = () => {
         const valid = isTokenValid();
         setIsAuthenticated(valid);
+
+        if (valid) {
+            const expiry = parseInt(localStorage.getItem('tokenExpiry') || '0');
+            setExpiresAt(expiry);
+
+            const diff = expiry - Date.now();
+            const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            setDaysLeft(days > 0 ? days : 0);
+        } else {
+            setExpiresAt(null);
+            setDaysLeft(null);
+        }
+
         setIsLoading(false);
     };
 
     const logout = () => {
         clearToken();
         setIsAuthenticated(false);
+        setExpiresAt(null);
+        setDaysLeft(null);
         window.location.href = '/login';
     };
 
@@ -37,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ isAuthenticated, isLoading, checkAuth, logout }}>
+        <AuthContext.Provider value={{ isAuthenticated, isLoading, expiresAt, daysLeft, checkAuth, logout }}>
             {children}
         </AuthContext.Provider>
     );
