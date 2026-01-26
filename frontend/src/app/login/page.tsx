@@ -110,7 +110,7 @@ export default function LoginPage() {
                                 </form>
 
                                 <p className="text-muted text-center mt-3 mb-0 small">
-                                    Session expires after 4 hours
+                                    Session expires after 7 days
                                 </p>
                             </div>
                         </div>

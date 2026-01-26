@@ -82,8 +82,8 @@ def login():
         
         # Validate credentials
         if username == AUTH_USERNAME and password == AUTH_PASSWORD:
-            # Generate JWT token with 4-hour expiry
-            expiry_time = datetime.utcnow() + timedelta(hours=4)
+            # Generate JWT token with 7-day expiry
+            expiry_time = datetime.utcnow() + timedelta(days=7)
             
             token = jwt.encode({
                 'sub': username,
@@ -95,7 +95,7 @@ def login():
                 'success': True,
                 'token': token,
                 'expires_at': expiry_time.isoformat() + 'Z',
-                'expires_in': 14400  # 4 hours in seconds
+                'expires_in': 604800  # 7 days in seconds
             })
         
         return jsonify({'error': 'Invalid credentials'}), 401
