@@ -1,4 +1,5 @@
 'use client';
+// Force refresh
 
 import { useEffect, useRef } from 'react';
 import { checkHealth, addExpense, addSaving, updateExpense, updateSaving, deleteExpense, deleteSaving } from '@/lib/api';
