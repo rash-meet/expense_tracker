@@ -31,12 +31,12 @@ export default function SyncService() {
                     if (item.type === 'expense') {
                         switch (item.action) {
                             case 'add':
-                                const addRes = await addExpense(item.data);
+                                const addRes = await addExpense(item.data as any);
                                 success = addRes.success;
                                 break;
                             case 'update':
                                 if (item.data._id) {
-                                    const updateRes = await updateExpense(item.data._id, item.data);
+                                    const updateRes = await updateExpense(item.data._id, item.data as any);
                                     success = updateRes.success;
                                 }
                                 break;
@@ -50,12 +50,12 @@ export default function SyncService() {
                     } else if (item.type === 'saving') {
                         switch (item.action) {
                             case 'add':
-                                const addRes = await addSaving(item.data);
+                                const addRes = await addSaving(item.data as any);
                                 success = addRes.success;
                                 break;
                             case 'update':
                                 if (item.data._id) {
-                                    const updateRes = await updateSaving(item.data._id, item.data);
+                                    const updateRes = await updateSaving(item.data._id, item.data as any);
                                     success = updateRes.success;
                                 }
                                 break;
