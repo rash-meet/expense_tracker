@@ -6,7 +6,7 @@ import ProtectedLayout from '@/components/ProtectedLayout';
 import { useAuth } from '@/lib/auth';
 
 export default function HomePage() {
-  const { expiresAt } = useAuth();
+  const { expiresAt, daysLeft } = useAuth();
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number } | null>(null);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function HomePage() {
 
                 {timeLeft.days > 2 ? (
                   <div className="display-6 fw-bold text-success">
-                    {timeLeft.days} <span className="fs-5 text-muted">days left</span>
+                    {daysLeft} <span className="fs-5 text-muted">days left</span>
                   </div>
                 ) : (
                   <div>
