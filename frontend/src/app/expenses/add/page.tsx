@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { addExpense, checkHealth } from '@/lib/api';
-import { addToSyncQueue } from '@/lib/offline';
+import { addToSyncQueue, addOfflineExpense } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 
 const CATEGORIES = ['Travel', 'Food', 'Shopping', 'Mazze', 'Other'];
@@ -58,9 +58,10 @@ export default function AddExpensePage() {
                 }
             }
 
-            // If offline OR online submission failed, add to sync queue
+            // If offline OR online submission failed, add to sync queue and local cache
             if (!isOnline || !submissionSuccess) {
                 await addToSyncQueue('expense', 'add', expense);
+                await addOfflineExpense(expense); // Store locally for immediate display
                 submissionSuccess = true;
             }
 

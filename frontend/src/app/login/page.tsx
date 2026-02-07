@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 function LoginForm() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [totpCode, setTotpCode] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -23,13 +24,19 @@ function LoginForm() {
         setError('');
         setIsLoading(true);
 
-        const result = await login(username, password);
+        if (totpCode.length !== 6) {
+            setError('Please enter a 6-digit TOTP code from your authenticator app.');
+            setIsLoading(false);
+            return;
+        }
+
+        const result = await login(username, password, totpCode);
 
         if (result) {
             checkAuth(); // Update auth state immediately
             router.push('/');
         } else {
-            setError('Invalid username or password. Please try again.');
+            setError('Invalid credentials or TOTP code. Please try again.');
         }
 
         setIsLoading(false);
@@ -98,6 +105,27 @@ function LoginForm() {
                                             >
                                                 <i className={`bi bi-eye${showPassword ? '-slash' : ''}`}></i>
                                             </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-3">
+                                        <label htmlFor="totpCode" className="form-label text-white">
+                                            <i className="bi bi-shield-lock me-1"></i> Authenticator Code
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="totpCode"
+                                            className="form-control text-center"
+                                            value={totpCode}
+                                            onChange={(e) => setTotpCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                                            placeholder="000000"
+                                            maxLength={6}
+                                            required
+                                            autoComplete="one-time-code"
+                                            style={{ letterSpacing: '0.5em', fontSize: '1.2rem' }}
+                                        />
+                                        <div className="form-text text-muted small">
+                                            Enter the 6-digit code from Google/Microsoft Authenticator
                                         </div>
                                     </div>
 

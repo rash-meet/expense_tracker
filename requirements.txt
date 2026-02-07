@@ -8,3 +8,5 @@ python-dotenv
 pytz
 PyJWT
 flask-cors
+pyotp
+qrcode[pil]

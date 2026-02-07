@@ -75,12 +75,12 @@ async function apiRequest<T>(
 }
 
 // Auth APIs
-export async function login(username: string, password: string): Promise<AuthToken | null> {
+export async function login(username: string, password: string, totpCode: string): Promise<AuthToken | null> {
     try {
         const response = await fetch(`${API_URL}/api/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify({ username, password, totp_code: totpCode }),
         });
 
         const data = await response.json();
@@ -106,7 +106,7 @@ export async function checkHealth(): Promise<boolean> {
     try {
         const response = await fetch(`${API_URL}/api/health`, {
             method: 'GET',
-            signal: AbortSignal.timeout(5000),
+            signal: AbortSignal.timeout(2000), // Reduced from 5s to 2s for faster offline detection
         });
         const data = await response.json();
         return response.ok && data.status === 'connected';

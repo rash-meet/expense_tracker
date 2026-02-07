@@ -165,3 +165,116 @@ export async function hasCachedData(): Promise<boolean> {
         return false;
     }
 }
+
+// ==================== MONTH-BASED STORAGE ====================
+
+const CURRENT_MONTH_KEY = 'cached_month';
+
+// Get current month key in YYYY-MM format
+function getCurrentMonthKey(): string {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Get stored month from metadata
+async function getStoredMonth(): Promise<string | null> {
+    try {
+        const db = await openDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(STORES.METADATA, 'readonly');
+            const store = tx.objectStore(STORES.METADATA);
+            const request = store.get(CURRENT_MONTH_KEY);
+            request.onsuccess = () => {
+                const result = request.result;
+                resolve(result?.value || null);
+            };
+            request.onerror = () => resolve(null);
+        });
+    } catch {
+        return null;
+    }
+}
+
+// Save current month to metadata
+async function setStoredMonth(month: string): Promise<void> {
+    try {
+        const db = await openDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(STORES.METADATA, 'readwrite');
+            const store = tx.objectStore(STORES.METADATA);
+            store.put({ key: CURRENT_MONTH_KEY, value: month });
+            tx.oncomplete = () => resolve();
+        });
+    } catch {
+        // Ignore errors
+    }
+}
+
+// Check and clear old month data - call this on app load
+export async function checkAndClearOldMonthData(): Promise<boolean> {
+    try {
+        const currentMonth = getCurrentMonthKey();
+        const storedMonth = await getStoredMonth();
+
+        if (storedMonth && storedMonth !== currentMonth) {
+            console.log(`[Offline] Month changed from ${storedMonth} to ${currentMonth}. Clearing old data...`);
+            await clearStore(STORES.EXPENSES);
+            await clearStore(STORES.SAVINGS);
+            await clearStore(STORES.SYNC_QUEUE);
+            await setStoredMonth(currentMonth);
+            return true; // Data was cleared
+        }
+
+        if (!storedMonth) {
+            await setStoredMonth(currentMonth);
+        }
+
+        return false;
+    } catch {
+        return false;
+    }
+}
+
+// ==================== OFFLINE ENTRY STORAGE ====================
+// These functions store entries locally so they appear in reports even when backend is down
+
+export async function addOfflineExpense(expense: Expense): Promise<void> {
+    await addToStore(STORES.EXPENSES, {
+        ...expense,
+        synced: false,
+        _pending: true,
+        _offlineId: `offline_${Date.now()}`
+    });
+}
+
+export async function addOfflineSaving(saving: Saving): Promise<void> {
+    await addToStore(STORES.SAVINGS, {
+        ...saving,
+        synced: false,
+        _pending: true,
+        _offlineId: `offline_${Date.now()}`
+    });
+}
+
+// Filter cached data to only include current month entries
+export async function getCachedExpensesForCurrentMonth(): Promise<Expense[]> {
+    const currentMonth = getCurrentMonthKey();
+    const all = await getCachedExpenses();
+
+    return all.filter(expense => {
+        if (!expense.date) return true;
+        const expenseMonth = expense.date.substring(0, 7);
+        return expenseMonth === currentMonth;
+    });
+}
+
+export async function getCachedSavingsForCurrentMonth(): Promise<Saving[]> {
+    const currentMonth = getCurrentMonthKey();
+    const all = await getCachedSavings();
+
+    return all.filter(saving => {
+        if (!saving.date) return true;
+        const savingMonth = saving.date.substring(0, 7);
+        return savingMonth === currentMonth;
+    });
+}

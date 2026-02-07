@@ -1,12 +1,15 @@
-# api.py - REST API endpoints for PWA offline sync with JWT Authentication
+# api.py - REST API endpoints for PWA offline sync with JWT Authentication + TOTP 2FA
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 from functools import wraps
 import pytz
 import jwt
+import pyotp
+import qrcode
 import os
+from io import BytesIO
 
 IST = pytz.timezone('Asia/Kolkata')
 
@@ -20,10 +23,12 @@ savings_collection = None
 AUTH_USERNAME = None
 AUTH_PASSWORD = None
 JWT_SECRET = None
+TOTP_SECRET = None
+TOTP_ISSUER = "Expense Tracker"
 
 def init_api(expenses, savings):
     global expenses_collection, savings_collection
-    global AUTH_USERNAME, AUTH_PASSWORD, JWT_SECRET
+    global AUTH_USERNAME, AUTH_PASSWORD, JWT_SECRET, TOTP_SECRET
     
     expenses_collection = expenses
     savings_collection = savings
@@ -32,6 +37,13 @@ def init_api(expenses, savings):
     AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
     AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "changeme")
     JWT_SECRET = os.getenv("JWT_SECRET", "jwt-secret-key-change-in-production")
+    TOTP_SECRET = os.getenv("TOTP_SECRET")
+    
+    # Generate TOTP secret if not set (for first-time setup)
+    if not TOTP_SECRET:
+        TOTP_SECRET = pyotp.random_base32()
+        print(f"\n[TOTP] No TOTP_SECRET found! Generated new secret: {TOTP_SECRET}")
+        print(f"[TOTP] Add this to your environment variables and restart.\n")
 
 
 # ==================== AUTHENTICATION ====================
@@ -67,7 +79,7 @@ def require_auth(f):
 
 @api.route('/login', methods=['POST'])
 def login():
-    """Login endpoint - returns JWT token on successful authentication"""
+    """Login endpoint - requires username, password, and TOTP code"""
     try:
         data = request.get_json()
         
@@ -76,29 +88,67 @@ def login():
         
         username = data.get('username', '').strip()
         password = data.get('password', '')
+        totp_code = data.get('totp_code', '').strip()
         
         if not username or not password:
             return jsonify({'error': 'Username and password required'}), 400
         
-        # Validate credentials
-        if username == AUTH_USERNAME and password == AUTH_PASSWORD:
-            # Generate JWT token with 7-day expiry
-            expiry_time = datetime.utcnow() + timedelta(days=7)
-            
-            token = jwt.encode({
-                'sub': username,
-                'iat': datetime.utcnow(),
-                'exp': expiry_time
-            }, JWT_SECRET, algorithm='HS256')
-            
-            return jsonify({
-                'success': True,
-                'token': token,
-                'expires_at': expiry_time.isoformat() + 'Z',
-                'expires_in': 604800  # 7 days in seconds
-            })
+        if not totp_code:
+            return jsonify({'error': 'TOTP code required', 'code': 'TOTP_REQUIRED'}), 400
         
-        return jsonify({'error': 'Invalid credentials'}), 401
+        # Validate credentials first
+        if username != AUTH_USERNAME or password != AUTH_PASSWORD:
+            return jsonify({'error': 'Invalid credentials'}), 401
+        
+        # Verify TOTP code
+        totp = pyotp.TOTP(TOTP_SECRET)
+        if not totp.verify(totp_code, valid_window=1):  # Allow 1 window before/after for clock drift
+            return jsonify({'error': 'Invalid TOTP code', 'code': 'INVALID_TOTP'}), 401
+        
+        # Generate JWT token with 7-day expiry
+        expiry_time = datetime.utcnow() + timedelta(days=7)
+        
+        token = jwt.encode({
+            'sub': username,
+            'iat': datetime.utcnow(),
+            'exp': expiry_time
+        }, JWT_SECRET, algorithm='HS256')
+        
+        return jsonify({
+            'success': True,
+            'token': token,
+            'expires_at': expiry_time.isoformat() + 'Z',
+            'expires_in': 604800  # 7 days in seconds
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api.route('/totp-setup', methods=['GET'])
+def totp_setup():
+    """Get QR code for TOTP setup - only use this once during initial setup!"""
+    try:
+        # Generate provisioning URI for authenticator app
+        totp = pyotp.TOTP(TOTP_SECRET)
+        provisioning_uri = totp.provisioning_uri(
+            name="rashmeetmailme@gmail.com",
+            issuer_name=TOTP_ISSUER
+        )
+        
+        # Generate QR code
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(provisioning_uri)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Save to bytes buffer
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        
+        return send_file(buffer, mimetype='image/png')
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

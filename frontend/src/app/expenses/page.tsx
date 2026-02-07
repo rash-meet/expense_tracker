@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getExpenses, deleteExpense, checkHealth, getStats } from '@/lib/api';
-import { getCachedExpenses, cacheExpenses } from '@/lib/offline';
+import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Expense } from '@/types';
 
@@ -85,7 +85,7 @@ export default function ExpenseReportPage() {
                 filters.to_date = end.toISOString().split('T')[0];
             }
 
-            const response = await getExpenses(pageNum, 200, filters);
+            const response = await getExpenses(pageNum, 50, filters);
 
             if (isReset) {
                 setExpenses(response.data);

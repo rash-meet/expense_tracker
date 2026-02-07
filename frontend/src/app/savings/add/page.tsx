@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { addSaving, checkHealth } from '@/lib/api';
-import { addToSyncQueue } from '@/lib/offline';
+import { addToSyncQueue, addOfflineSaving } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 
 const SAVING_MODES = ['Cash', 'Bank', 'Investment', 'Other'];
@@ -54,9 +54,10 @@ export default function AddSavingPage() {
                 }
             }
 
-            // If offline OR online submission failed, add to sync queue
+            // If offline OR online submission failed, add to sync queue and local cache
             if (!isOnline || !submissionSuccess) {
                 await addToSyncQueue('saving', 'add', saving);
+                await addOfflineSaving(saving); // Store locally for immediate display
                 submissionSuccess = true;
             }
 

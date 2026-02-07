@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getSavings, deleteSaving, checkHealth, getStats } from '@/lib/api';
-import { getCachedSavings, cacheSavings } from '@/lib/offline';
+import { getCachedSavings, cacheSavings, checkAndClearOldMonthData } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Saving } from '@/types';
 
@@ -74,7 +74,7 @@ export default function SavingReportPage() {
                 filters.to_date = end.toISOString().split('T')[0];
             }
 
-            const response = await getSavings(pageNum, 200, filters);
+            const response = await getSavings(pageNum, 50, filters);
 
             if (isReset) {
                 setSavings(response.data);
