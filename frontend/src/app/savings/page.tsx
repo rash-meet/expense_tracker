@@ -44,19 +44,42 @@ export default function SavingReportPage() {
         if (!isAuthenticated) return;
 
         // First, immediately show cached data
-        const showCachedFirst = async () => {
+        const initializeData = async () => {
             const cached = await getCachedSavings();
             if (cached.length > 0) {
                 setSavings(cached);
                 setFilteredSavings(cached);
                 setTotalFiltered(cached.reduce((sum, s) => sum + s.amount, 0));
                 setLoading(false); // Show cached data immediately
+                // Fetch fresh data in background (don't await)
+                loadDataInBackground(1);
+            } else {
+                // No cache, need to wait for API
+                loadData(1, true);
             }
-            // Then load fresh data from API
-            loadData(1, true);
         };
-        showCachedFirst();
+        initializeData();
     }, [isAuthenticated]);
+
+    // Background loading - doesn't show spinner
+    const loadDataInBackground = async (pageNum: number) => {
+        try {
+            const filters: any = {};
+            const response = await getSavings(pageNum, 50, filters);
+
+            if (response.data && response.data.length > 0) {
+                setSavings(response.data);
+                setFilteredSavings(response.data);
+                setTotalFiltered(response.data.reduce((sum, s) => sum + s.amount, 0));
+                setHasMore(pageNum < response.pagination.pages);
+                setPage(pageNum);
+                cacheSavings(response.data);
+                setIsOnline(true);
+            }
+        } catch {
+            setIsOnline(false);
+        }
+    };
 
     const loadData = async (pageNum: number, isReset: boolean = false) => {
         if (isReset) {

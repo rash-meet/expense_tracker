@@ -164,24 +164,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 /* ============ TEXT VISIBILITY FIXES ============ */
-/* Ensure all text is visible on dark background */
-
-/* General text colors */
-p,
-span,
-div,
-li,
-td,
-th,
-label,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  color: #f8f9fa;
-}
+\n
+/* Targeted fixes for dark theme visibility */
 
 /* Card content */
 .card,

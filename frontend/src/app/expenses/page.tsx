@@ -50,19 +50,48 @@ export default function ExpenseReportPage() {
         if (!isAuthenticated) return;
 
         // First, immediately show cached data
-        const showCachedFirst = async () => {
+        const initializeData = async () => {
             const cached = await getCachedExpenses();
             if (cached.length > 0) {
                 setExpenses(cached);
                 setFilteredExpenses(cached);
                 setTotalFiltered(cached.reduce((sum, e) => sum + e.amount, 0));
                 setLoading(false); // Show cached data immediately
+                // Fetch fresh data in background (don't await)
+                loadDataInBackground(1);
+            } else {
+                // No cache, need to wait for API
+                loadData(1, true);
             }
-            // Then load fresh data from API
-            loadData(1, true);
         };
-        showCachedFirst();
+        initializeData();
     }, [isAuthenticated]);
+
+    // Background loading - doesn't show spinner
+    const loadDataInBackground = async (pageNum: number) => {
+        try {
+            const filters: any = {};
+            const response = await getExpenses(pageNum, 50, filters);
+
+            if (response.data && response.data.length > 0) {
+                setExpenses(response.data);
+                setFilteredExpenses(response.data);
+                setTotalFiltered(response.data.reduce((sum, e) => sum + e.amount, 0));
+                setHasMore(pageNum < response.pagination.pages);
+                setPage(pageNum);
+                cacheExpenses(response.data);
+                setIsOnline(true);
+
+                const stats = await getStats();
+                if (stats) {
+                    setCurrentMonth(stats.current_month);
+                    setCurrentMonthTotal(stats.month_expenses);
+                }
+            }
+        } catch {
+            setIsOnline(false);
+        }
+    };
 
     const loadData = async (pageNum: number, isReset: boolean = false) => {
         if (isReset) {
