@@ -60,9 +60,43 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   --bs-table-hover-bg: #333;
 }
 
+/* Table header text visibility */
+.table thead th,
+.table-dark thead th,
+table thead th {
+  color: #fff !important;
+  background-color: #343a40 !important;
+}
+
 .alert-dark {
   background-color: #2a2a2a !important;
   color: #f8f9fa !important;
+}
+
+/* Placeholder text styling - IMPORTANT for visibility */
+::placeholder {
+  color: #adb5bd !important;
+  opacity: 1 !important;
+}
+
+::-webkit-input-placeholder {
+  color: #adb5bd !important;
+}
+
+::-moz-placeholder {
+  color: #adb5bd !important;
+}
+
+:-ms-input-placeholder {
+  color: #adb5bd !important;
+}
+
+/* Search input specific */
+input[type="search"],
+.search-input {
+  background-color: #2d2d2d !important;
+  color: #fff !important;
+  border: 1px solid #444 !important;
 }
 
 .form-label {
@@ -163,18 +197,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   border: 1px solid #444 !important;
 }
 
-/* ============ TEXT VISIBILITY FIXES ============ */
-\n
-/* Targeted fixes for dark theme visibility */
-
-/* Card content */
-.card,
-.card-body,
-.card-header,
-.card-footer {
-  color: #f8f9fa !important;
-}
-
 /* Table text */
 .table {
   color: #f8f9fa !important;
@@ -193,11 +215,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   border-color: #444 !important;
 }
 
-/* Badge and pill text */
-.badge {
-  color: #fff !important;
-}
-
 /* Dropdown menus */
 .dropdown-menu {
   background-color: #1f1f1f !important;
@@ -211,97 +228,4 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .dropdown-item:hover {
   background-color: #2d2d2d !important;
   color: #fff !important;
-}
-
-/* Modal text */
-.modal-content {
-  background-color: #1f1f1f !important;
-  color: #f8f9fa !important;
-}
-
-.modal-header,
-.modal-body,
-.modal-footer {
-  color: #f8f9fa !important;
-  border-color: #444 !important;
-}
-
-/* Alert text */
-.alert {
-  color: #f8f9fa !important;
-}
-
-/* Text muted override for visibility */
-.text-muted {
-  color: #adb5bd !important;
-}
-
-/* Small text */
-small,
-.small {
-  color: #adb5bd !important;
-}
-
-/* Stat cards / summary cards */
-.stats-card,
-.summary-card {
-  color: #f8f9fa !important;
-}
-
-/* Force white text on specific Bootstrap classes */
-.text-dark {
-  color: #f8f9fa !important;
-}
-
-/* Button text visibility */
-.btn-outline-secondary,
-.btn-outline-dark {
-  color: #f8f9fa !important;
-  border-color: #6c757d !important;
-}
-
-.btn-outline-secondary:hover,
-.btn-outline-dark:hover {
-  background-color: #6c757d !important;
-  color: #fff !important;
-}
-
-/* Filter/search section */
-.filter-section,
-.search-section {
-  color: #f8f9fa !important;
-}
-
-/* Accordion */
-.accordion-button {
-  background-color: #2d2d2d !important;
-  color: #f8f9fa !important;
-}
-
-.accordion-body {
-  background-color: #1f1f1f !important;
-  color: #f8f9fa !important;
-}
-
-/* Pagination */
-.page-link {
-  background-color: #1f1f1f !important;
-  color: #f8f9fa !important;
-  border-color: #444 !important;
-}
-
-.page-link:hover {
-  background-color: #2d2d2d !important;
-  color: #fff !important;
-}
-
-.page-item.active .page-link {
-  background-color: #0d6efd !important;
-  border-color: #0d6efd !important;
-}
-
-/* Toast notifications */
-.toast {
-  background-color: #1f1f1f !important;
-  color: #f8f9fa !important;
 }
