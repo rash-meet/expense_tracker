@@ -43,8 +43,19 @@ export default function SavingReportPage() {
     useEffect(() => {
         if (!isAuthenticated) return;
 
-        // Load data without default date filters to allow full history pagination
-        loadData(1, true);
+        // First, immediately show cached data
+        const showCachedFirst = async () => {
+            const cached = await getCachedSavings();
+            if (cached.length > 0) {
+                setSavings(cached);
+                setFilteredSavings(cached);
+                setTotalFiltered(cached.reduce((sum, s) => sum + s.amount, 0));
+                setLoading(false); // Show cached data immediately
+            }
+            // Then load fresh data from API
+            loadData(1, true);
+        };
+        showCachedFirst();
     }, [isAuthenticated]);
 
     const loadData = async (pageNum: number, isReset: boolean = false) => {
@@ -102,6 +113,11 @@ export default function SavingReportPage() {
 
             setHasMore(pageNum < response.pagination.pages);
             setPage(pageNum);
+
+            // Cache the data for offline use
+            if (isReset) {
+                cacheSavings(response.data);
+            }
 
             const allLoaded = isReset ? response.data : [...savings, ...response.data];
             const modes = [...new Set(allLoaded.map(s => s.saving_mode))];

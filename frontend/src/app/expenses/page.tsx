@@ -49,8 +49,19 @@ export default function ExpenseReportPage() {
     useEffect(() => {
         if (!isAuthenticated) return;
 
-        // Load data without default date filters to allow full history pagination
-        loadData(1, true);
+        // First, immediately show cached data
+        const showCachedFirst = async () => {
+            const cached = await getCachedExpenses();
+            if (cached.length > 0) {
+                setExpenses(cached);
+                setFilteredExpenses(cached);
+                setTotalFiltered(cached.reduce((sum, e) => sum + e.amount, 0));
+                setLoading(false); // Show cached data immediately
+            }
+            // Then load fresh data from API
+            loadData(1, true);
+        };
+        showCachedFirst();
     }, [isAuthenticated]);
 
     const loadData = async (pageNum: number, isReset: boolean = false) => {
@@ -115,6 +126,11 @@ export default function ExpenseReportPage() {
 
             setHasMore(pageNum < response.pagination.pages);
             setPage(pageNum);
+
+            // Cache the data for offline use
+            if (isReset) {
+                cacheExpenses(response.data);
+            }
 
             // Update categories/modes from ALL loaded data (or just current batch? Better all)
             // But we only have loaded data.
