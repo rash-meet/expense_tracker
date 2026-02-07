@@ -1,13 +1,13 @@
 # Expense Tracker - Separate Frontend & Backend
 
-A personal expense and savings tracker with **separate frontend and backend deployments** for improved availability.
+A personal expense and savings tracker with **separate frontend and backend deployments**, **TOTP 2FA authentication**, and **instant offline access**.
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────────────────┐     ┌─────────────────────────┐
 │   Vercel (Frontend)     │────▶│   Render (Backend)      │
-│   Next.js App           │     │   Flask API             │
+│   Next.js App           │     │   Flask API + TOTP 2FA  │
 │   Always Available      │     │   Free Tier (sleeps)    │
 └─────────────────────────┘     └─────────────────────────┘
          │                                   │
@@ -20,9 +20,10 @@ A personal expense and savings tracker with **separate frontend and backend depl
 
 ## ✨ Features
 
-- **🔐 JWT Authentication**: 4-hour session expiry, credentials in backend .env
-- **📱 Offline Mode**: Works while backend wakes up using cached data
-- **🔄 Auto Sync**: Queue operations offline, sync when connected
+- **🔐 TOTP 2FA**: Secure login with Google/Microsoft Authenticator
+- **🚀 Instant Loading**: Cached data shows immediately, API updates in background
+- **📱 Offline Mode**: Add entries offline, auto-sync when connected
+- **📅 Month-Based Cache**: Auto-clears previous month's data
 - **🌙 Dark Theme**: Beautiful modern dark UI
 - **📊 Reports**: Filter by category, payment mode, date range
 
@@ -39,6 +40,7 @@ MONGO_URI=your_mongodb_uri
 AUTH_USERNAME=your_username
 AUTH_PASSWORD=your_secure_password
 JWT_SECRET=your_jwt_secret
+TOTP_SECRET=your_totp_secret  # Generate with: python -c "import pyotp; print(pyotp.random_base32())"
 FRONTEND_URL=http://localhost:3000
 
 # Run
@@ -71,6 +73,7 @@ npm run dev
    - `AUTH_USERNAME`
    - `AUTH_PASSWORD`
    - `JWT_SECRET`
+   - `TOTP_SECRET` (for 2FA - see setup below)
    - `FRONTEND_URL` (your Vercel URL)
 4. Deploy
 
@@ -84,6 +87,7 @@ npm run dev
 
 ## 🔑 Authentication
 
+### Credentials
 Login credentials are set in the backend's `.env` file:
 
 ```env
@@ -91,16 +95,36 @@ AUTH_USERNAME=admin
 AUTH_PASSWORD=your_secure_password
 ```
 
-Sessions expire after **4 hours** of inactivity.
+Sessions expire after **7 days**.
+
+### TOTP 2FA Setup
+
+1. Generate a TOTP secret:
+   ```python
+   import pyotp
+   print(pyotp.random_base32())
+   ```
+
+2. Add to your `.env` or Render environment:
+   ```env
+   TOTP_SECRET=YOUR_GENERATED_SECRET
+   ```
+
+3. Setup your authenticator app:
+   - Visit `https://your-backend-url/api/totp-setup` (requires login) to scan QR code
+   - OR manually add in Google/Microsoft Authenticator:
+     - **Account**: Expense Tracker
+     - **Secret**: (your TOTP_SECRET)
+     - **Type**: Time-based
 
 ## 📁 Project Structure
 
 ```
 expense_tracker/
 ├── app.py              # Flask backend
-├── api.py              # REST API with JWT auth
+├── api.py              # REST API with JWT + TOTP auth
 ├── config.py           # Backend config
-├── requirements.txt    # Python dependencies
+├── requirements.txt    # Python dependencies (includes pyotp, qrcode)
 ├── .env                # Backend secrets (not in git)
 │
 └── frontend/           # Next.js frontend
@@ -116,8 +140,9 @@ expense_tracker/
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/api/login` | ❌ | Login, get JWT token |
+| POST | `/api/login` | ❌ | Login with username, password, TOTP code |
 | GET | `/api/health` | ❌ | Health check |
+| GET | `/api/totp-setup` | ✅ | Get QR code for authenticator setup |
 | GET | `/api/verify` | ✅ | Verify token |
 | GET | `/api/expenses` | ✅ | List expenses |
 | POST | `/api/expenses` | ✅ | Add expense |
@@ -132,7 +157,15 @@ expense_tracker/
 
 ## 🔒 Security Notes
 
-- JWT tokens are stored in localStorage (expires in 4 hours)
+- **TOTP 2FA** required for all logins (Google/Microsoft Authenticator)
+- JWT tokens stored in localStorage (expires in 7 days)
 - Passwords are NOT hashed (single-user app with .env credentials)
-- CORS is configured to only allow your frontend origin
+- CORS configured to only allow your frontend origin
 - For production, use HTTPS for both frontend and backend
+
+## ⚡ Performance Features
+
+- **Cache-first loading**: Reports show cached data instantly
+- **Background refresh**: API data fetched silently without blocking UI
+- **2-second health check timeout**: Fast offline detection
+- **Month-based cache expiry**: Auto-clears old data when month changes
