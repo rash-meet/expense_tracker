@@ -126,6 +126,7 @@ def login():
 
 
 @api.route('/totp-setup', methods=['GET'])
+@require_auth
 def totp_setup():
     """Get QR code for TOTP setup - only use this once during initial setup!"""
     try:
