@@ -20,7 +20,7 @@ __pycache__/
 con_check.py
 
 # Generated files
-/static/*.png
+/static/*_chart.png
 *.log
 *.db
 
