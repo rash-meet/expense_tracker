@@ -2,14 +2,15 @@
 
 import { Expense, Saving, SyncQueueItem } from '@/types';
 
-const DB_NAME = 'expense-tracker-db';
-const DB_VERSION = 1;
+const DB_NAME = 'finchest-db';
+const DB_VERSION = 2;
 
 const STORES = {
     EXPENSES: 'expenses',
     SAVINGS: 'savings',
     SYNC_QUEUE: 'sync_queue',
     METADATA: 'metadata',
+    MONTHLY_TOTALS: 'monthly_totals',
 } as const;
 
 // Open IndexedDB
@@ -43,6 +44,11 @@ function openDB(): Promise<IDBDatabase> {
 
             if (!db.objectStoreNames.contains(STORES.METADATA)) {
                 db.createObjectStore(STORES.METADATA, { keyPath: 'key' });
+            }
+
+            // Monthly totals store
+            if (!db.objectStoreNames.contains(STORES.MONTHLY_TOTALS)) {
+                db.createObjectStore(STORES.MONTHLY_TOTALS, { keyPath: 'monthKey' });
             }
         };
     });
@@ -278,3 +284,113 @@ export async function getCachedSavingsForCurrentMonth(): Promise<Saving[]> {
         return savingMonth === currentMonth;
     });
 }
+
+// ==================== MONTHLY TOTALS CACHING ====================
+
+export interface MonthlyTotals {
+    monthKey: string;
+    monthExpenses: number;
+    monthSavings: number;
+    totalExpenses: number;
+    totalSavings: number;
+    currentMonth: string;
+    lastUpdated: string;
+    hasPending?: boolean;
+}
+
+// Cache monthly totals from API stats
+export async function cacheMonthlyTotals(statsData: {
+    month_expenses: number;
+    month_savings: number;
+    total_expenses: number;
+    total_savings: number;
+    current_month: string;
+}): Promise<void> {
+    try {
+        const monthKey = getCurrentMonthKey();
+        const totalsData: MonthlyTotals = {
+            monthKey,
+            monthExpenses: statsData.month_expenses || 0,
+            monthSavings: statsData.month_savings || 0,
+            totalExpenses: statsData.total_expenses || 0,
+            totalSavings: statsData.total_savings || 0,
+            currentMonth: statsData.current_month || '',
+            lastUpdated: new Date().toISOString(),
+        };
+
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORES.MONTHLY_TOTALS, 'readwrite');
+            const store = tx.objectStore(STORES.MONTHLY_TOTALS);
+            store.put(totalsData);
+            tx.oncomplete = () => {
+                console.log('[Finchest] Cached monthly totals:', totalsData);
+                resolve();
+            };
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch (error) {
+        console.error('[Finchest] Error caching monthly totals:', error);
+    }
+}
+
+// Get cached monthly totals
+export async function getCachedMonthlyTotals(): Promise<MonthlyTotals | null> {
+    try {
+        const monthKey = getCurrentMonthKey();
+        const db = await openDB();
+
+        return new Promise((resolve) => {
+            const tx = db.transaction(STORES.MONTHLY_TOTALS, 'readonly');
+            const store = tx.objectStore(STORES.MONTHLY_TOTALS);
+            const request = store.get(monthKey);
+
+            request.onsuccess = async () => {
+                const cached = request.result as MonthlyTotals | undefined;
+                if (cached) {
+                    // Check for pending items
+                    const pendingItems = await getPendingSyncItems();
+                    const hasPending = pendingItems.length > 0;
+                    resolve({ ...cached, hasPending });
+                } else {
+                    resolve(null);
+                }
+            };
+            request.onerror = () => resolve(null);
+        });
+    } catch {
+        return null;
+    }
+}
+
+// Update local monthly totals when adding expense offline
+export async function updateLocalMonthlyTotals(amount: number, type: 'expense' | 'saving'): Promise<void> {
+    try {
+        const cached = await getCachedMonthlyTotals();
+        if (!cached) return;
+
+        if (type === 'expense') {
+            cached.monthExpenses += amount;
+            cached.totalExpenses += amount;
+        } else {
+            cached.monthSavings += amount;
+            cached.totalSavings += amount;
+        }
+        cached.lastUpdated = new Date().toISOString();
+
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORES.MONTHLY_TOTALS, 'readwrite');
+            const store = tx.objectStore(STORES.MONTHLY_TOTALS);
+            store.put(cached);
+            tx.oncomplete = () => {
+                console.log('[Finchest] Updated local monthly totals:', cached);
+                resolve();
+            };
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch (error) {
+        console.error('[Finchest] Error updating local monthly totals:', error);
+    }
+}
+

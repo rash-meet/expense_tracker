@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getSavings, deleteSaving, checkHealth, getStats } from '@/lib/api';
-import { getCachedSavings, cacheSavings, checkAndClearOldMonthData } from '@/lib/offline';
+import { getCachedSavings, cacheSavings, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Saving } from '@/types';
 
@@ -21,8 +21,10 @@ export default function SavingReportPage() {
     const [isOnline, setIsOnline] = useState(true);
     const [loading, setLoading] = useState(true);
     const [totalSaved, setTotalSaved] = useState(0);
+    const [currentMonth, setCurrentMonth] = useState('');
     const [totalFiltered, setTotalFiltered] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
+    const [hasPending, setHasPending] = useState(false);
 
     // Pagination State
     const [page, setPage] = useState(1);
@@ -45,6 +47,14 @@ export default function SavingReportPage() {
 
         // First, immediately show cached data
         const initializeData = async () => {
+            // First load cached monthly totals
+            const cachedTotals = await getCachedMonthlyTotals();
+            if (cachedTotals) {
+                setTotalSaved(cachedTotals.monthSavings);
+                setCurrentMonth(cachedTotals.currentMonth);
+                setHasPending(cachedTotals.hasPending || false);
+            }
+
             const cached = await getCachedSavings();
             if (cached.length > 0) {
                 setSavings(cached);
@@ -116,7 +126,11 @@ export default function SavingReportPage() {
 
                 const stats = await getStats();
                 if (stats) {
-                    setTotalSaved(stats.total_savings);
+                    setTotalSaved(stats.month_savings);
+                    setCurrentMonth(stats.current_month);
+                    setHasPending(false);
+                    // Cache the monthly totals for offline use
+                    await cacheMonthlyTotals(stats);
                 }
             } else {
                 setSavings(prev => {
@@ -207,9 +221,12 @@ export default function SavingReportPage() {
         <ProtectedLayout>
             <h2 className="mb-4 fw-bold">Saving Report</h2>
 
-            {/* Total Saved */}
-            <div className="alert alert-dark mb-4">
-                Total Saved: ₹{totalSaved.toFixed(2)}
+            {/* Total Saved This Month */}
+            <div className="alert mb-4" style={{ backgroundColor: '#1a365d', borderColor: '#4a8a80' }}>
+                <span>💰 Total Saved in {currentMonth || 'this month'}: ₹{totalSaved.toFixed(2)}</span>
+                {hasPending && (
+                    <span className="badge bg-warning text-dark ms-2">+ Pending</span>
+                )}
             </div>
 
             {/* Search Box */}

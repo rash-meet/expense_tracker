@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { useAuth } from '@/lib/auth';
 
@@ -41,7 +42,11 @@ export default function HomePage() {
   return (
     <ProtectedLayout>
       <div className="text-center my-4">
-        <h1 className="mb-4 fw-bold">Expense Tracker</h1>
+        <div className="mb-4">
+          <Image src="/logo.png" alt="Finchest" width={80} height={80} className="mb-3" />
+          <h1 className="fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
+          <p className="text-muted">Your Personal Finance Chest</p>
+        </div>
         <div className="row g-3 justify-content-center">
           {buttons.map((btn) => (
             <div key={btn.href} className="col-12 col-md-3">

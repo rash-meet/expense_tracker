@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getExpenses, deleteExpense, checkHealth, getStats } from '@/lib/api';
-import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData } from '@/lib/offline';
+import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Expense } from '@/types';
 
@@ -24,6 +24,7 @@ export default function ExpenseReportPage() {
     const [totalFiltered, setTotalFiltered] = useState(0);
     const [currentMonth, setCurrentMonth] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [hasPending, setHasPending] = useState(false);
 
     // Pagination State
     const [page, setPage] = useState(1);
@@ -51,6 +52,14 @@ export default function ExpenseReportPage() {
 
         // First, immediately show cached data
         const initializeData = async () => {
+            // First load cached monthly totals
+            const cachedTotals = await getCachedMonthlyTotals();
+            if (cachedTotals) {
+                setCurrentMonth(cachedTotals.currentMonth);
+                setCurrentMonthTotal(cachedTotals.monthExpenses);
+                setHasPending(cachedTotals.hasPending || false);
+            }
+
             const cached = await getCachedExpenses();
             if (cached.length > 0) {
                 setExpenses(cached);
@@ -86,6 +95,9 @@ export default function ExpenseReportPage() {
                 if (stats) {
                     setCurrentMonth(stats.current_month);
                     setCurrentMonthTotal(stats.month_expenses);
+                    setHasPending(false);
+                    // Cache the monthly totals for offline use
+                    await cacheMonthlyTotals(stats);
                 }
             }
         } catch {
@@ -247,8 +259,11 @@ export default function ExpenseReportPage() {
             <h2 className="mb-4 fw-bold">Expense Report</h2>
 
             {/* Current Month Total */}
-            <div className="alert alert-dark mb-4">
-                Total Spent in {currentMonth}: ₹{currentMonthTotal.toFixed(2)}
+            <div className="alert mb-4" style={{ backgroundColor: '#1a365d', borderColor: '#4a8a80' }}>
+                <span>💰 Total Spent in {currentMonth}: ₹{currentMonthTotal.toFixed(2)}</span>
+                {hasPending && (
+                    <span className="badge bg-warning text-dark ms-2">+ Pending</span>
+                )}
             </div>
 
             {/* Search Box */}

@@ -1,18 +1,26 @@
 @import "tailwindcss";
 
-/* Dark theme - matching original Flask app */
+/* Finchest - Dark theme with navy blue and teal accents */
+:root {
+  --finchest-navy: #0f172a;
+  --finchest-navy-light: #1e293b;
+  --finchest-primary: #1a365d;
+  --finchest-accent: #4a8a80;
+  --finchest-gold: #d4a574;
+}
+
 body {
-  background-color: #121212 !important;
+  background-color: var(--finchest-navy) !important;
   color: #f8f9fa !important;
 }
 
 .bg-custom {
-  background-color: #1f1f1f !important;
+  background-color: var(--finchest-navy-light) !important;
 }
 
 .card-dark {
-  background-color: #1f1f1f !important;
-  border: none !important;
+  background-color: var(--finchest-navy-light) !important;
+  border: 1px solid var(--finchest-accent) !important;
 }
 
 /* Force dark theme on all form inputs */
@@ -107,9 +115,9 @@ input[type="search"],
   color: white !important;
 }
 
-/* Navbar styling */
+/* Navbar styling - Finchest navy theme */
 .navbar {
-  background-color: #212529 !important;
+  background-color: var(--finchest-primary) !important;
 }
 
 .navbar-toggler {

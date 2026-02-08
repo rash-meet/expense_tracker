@@ -4,10 +4,12 @@ import './globals.css';
 import { AuthProvider } from '@/lib/auth';
 
 export const metadata: Metadata = {
-  title: 'Expense Tracker',
-  description: 'Track your expenses and savings',
+  title: 'Finchest - Your Personal Finance Chest',
+  description: 'Track your expenses and savings with offline support',
+  manifest: '/manifest.json',
   icons: {
-    icon: '/favicon.svg',
+    icon: '/logo.png',
+    apple: '/icon-192.png',
   },
 };
 
@@ -27,7 +29,10 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"
           rel="stylesheet"
         />
-        <meta name="theme-color" content="#121212" />
+        <meta name="theme-color" content="#1a365d" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Finchest" />
       </head>
       <body className="bg-dark text-white">
         <AuthProvider>

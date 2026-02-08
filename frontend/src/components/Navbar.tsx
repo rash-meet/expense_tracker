@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/lib/auth';
 
 export default function Navbar() {
@@ -26,11 +27,11 @@ export default function Navbar() {
 
     return (
         <>
-            <nav className="navbar navbar-dark" style={{ backgroundColor: '#212529', borderBottom: '1px solid #333' }}>
+            <nav className="navbar navbar-dark" style={{ backgroundColor: '#1a365d', borderBottom: '1px solid #4a8a80' }}>
                 <div className="container d-flex justify-content-between align-items-center py-2">
                     <Link className="navbar-brand d-flex align-items-center text-white text-decoration-none" href="/" onClick={closeMenu}>
-                        <i className="bi bi-wallet me-2"></i>
-                        Expense Tracker
+                        <Image src="/logo.png" alt="Finchest" width={32} height={32} className="me-2" />
+                        <span style={{ fontWeight: 600 }}>Finchest</span>
                     </Link>
 
                     {/* Desktop Navigation */}
@@ -77,8 +78,8 @@ export default function Navbar() {
                 <div
                     className="d-md-none"
                     style={{
-                        backgroundColor: '#1a1a1a',
-                        borderBottom: '1px solid #333',
+                        backgroundColor: '#0f172a',
+                        borderBottom: '1px solid #4a8a80',
                     }}
                 >
                     <div className="container py-2">
