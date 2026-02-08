@@ -41,17 +41,18 @@ export default function HomePage() {
 
   return (
     <ProtectedLayout>
-      <div className="text-center my-4">
+      <div className="text-center my-5">
         <div className="mb-4">
-          <Image
-            src="/logo.png"
-            alt="Finchest"
-            width={120}
-            height={120}
-            className="mb-3"
-            style={{ borderRadius: '16px' }}
-          />
-          <h1 className="display-5 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
+          {/* Logo with white circular background like Flask UI */}
+          <div className="d-inline-block p-3 rounded-circle mb-3" style={{ backgroundColor: 'white' }}>
+            <Image
+              src="/logo.png"
+              alt="Finchest"
+              width={80}
+              height={80}
+            />
+          </div>
+          <h1 className="display-4 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
           <p className="text-secondary fs-5">Your Personal Finance Chest</p>
         </div>
         <div className="row g-3 justify-content-center">
