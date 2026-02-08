@@ -44,12 +44,12 @@ export default function HomePage() {
       <div className="text-center my-5">
         <div className="mb-4">
           {/* Logo with white circular background like Flask UI */}
-          <div className="d-inline-block p-3 rounded-circle mb-3" style={{ backgroundColor: 'white' }}>
+          <div className="d-inline-block p-4 rounded-circle mb-3" style={{ backgroundColor: 'white' }}>
             <Image
               src="/logo.png"
               alt="Finchest"
-              width={80}
-              height={80}
+              width={120}
+              height={120}
             />
           </div>
           <h1 className="display-4 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
