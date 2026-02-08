@@ -1,11 +1,11 @@
 {
-    "name": "Expense Tracker",
-    "short_name": "Expenses",
-    "description": "Track your expenses and savings offline",
+    "name": "Finchest",
+    "short_name": "Finchest",
+    "description": "Your Personal Finance Chest - Track expenses and savings offline",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#121212",
-    "theme_color": "#121212",
+    "background_color": "#0f172a",
+    "theme_color": "#1a365d",
     "icons": [
         {
             "src": "/icon-192.png",

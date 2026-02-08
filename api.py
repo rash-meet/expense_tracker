@@ -24,7 +24,7 @@ AUTH_USERNAME = None
 AUTH_PASSWORD = None
 JWT_SECRET = None
 TOTP_SECRET = None
-TOTP_ISSUER = "Expense Tracker"
+TOTP_ISSUER = "Finchest"
 
 def init_api(expenses, savings):
     global expenses_collection, savings_collection

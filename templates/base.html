@@ -3,42 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Expense Tracker</title>
+    <title>Finchest - Your Personal Finance Chest</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"  rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"  rel="stylesheet">
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#121212">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="description" content="Finchest - Your Personal Finance Chest. Track expenses and savings with offline support.">
+    
+    <!-- PWA & Mobile Icons -->
+    <link rel="icon" type="image/png" sizes="512x512" href="/static/icon-512.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Finchest">
+    
     <style>
-        body {
-            background-color: #121212;
-            color: #f8f9fa;
+        :root {
+            --finchest-navy: #0f172a;
+            --finchest-navy-light: #1e293b;
+            --finchest-blue: #1a365d;
+            --finchest-teal: #4a8a80;
+            --finchest-teal-light: #5fb3a5;
+            --finchest-gold: #d4a853;
+            --finchest-text: #f1f5f9;
+            --finchest-text-muted: #94a3b8;
         }
-        .bg-custom { background-color: #1f1f1f; }
-        .card-dark { background-color: #1f1f1f; border: none; }
+        
+        body {
+            background-color: var(--finchest-navy);
+            color: var(--finchest-text);
+        }
+        .bg-custom { background-color: var(--finchest-navy-light); }
+        .card-dark { 
+            background-color: var(--finchest-navy-light); 
+            border: 1px solid rgba(74, 138, 128, 0.2);
+        }
         .form-control, .form-select {
-            background-color: #2d2d2d;
+            background-color: #1e293b;
             color: #fff;
-            border: 1px solid #444;
+            border: 1px solid rgba(74, 138, 128, 0.3);
         }
         .form-control:focus, .form-select:focus {
-            background-color: #2d2d2d;
+            background-color: #1e293b;
             color: #fff;
-            border-color: #666;
-            box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
+            border-color: var(--finchest-teal);
+            box-shadow: 0 0 0 0.2rem rgba(74, 138, 128, 0.25);
         }
         .table-dark {
-            --bs-table-bg: #1f1f1f;
-            --bs-table-striped-bg: #2a2a2a;
-            --bs-table-hover-bg: #333;
+            --bs-table-bg: var(--finchest-navy-light);
+            --bs-table-striped-bg: #243447;
+            --bs-table-hover-bg: #2d4156;
         }
         .alert-dark {
-            background-color: #2a2a2a;
-            color: #f8f9fa;
+            background-color: var(--finchest-navy-light);
+            color: var(--finchest-text);
+            border: 1px solid rgba(74, 138, 128, 0.3);
         }
         .btn-icon {
             font-size: 1.2rem;
             padding: 0.5rem 0.75rem;
         }
+        
+        /* Navbar styling */
+        .navbar {
+            background: linear-gradient(135deg, var(--finchest-blue) 0%, var(--finchest-navy) 100%) !important;
+            border-bottom: 1px solid rgba(74, 138, 128, 0.3) !important;
+        }
+        .navbar-brand {
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .navbar-brand img {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+        .nav-link {
+            color: var(--finchest-text-muted) !important;
+            transition: color 0.2s ease;
+        }
+        .nav-link:hover {
+            color: var(--finchest-teal-light) !important;
+        }
+        
+        /* Button styling */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--finchest-teal) 0%, #3d7a70 100%);
+            border: none;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--finchest-teal-light) 0%, var(--finchest-teal) 100%);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            border: none;
+        }
+        .btn-info {
+            background: linear-gradient(135deg, var(--finchest-blue) 0%, #15425e 100%);
+            border: none;
+            color: white;
+        }
+        .btn-info:hover {
+            background: linear-gradient(135deg, #1e4976 0%, var(--finchest-blue) 100%);
+            color: white;
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, var(--finchest-gold) 0%, #c49a47 100%);
+            border: none;
+            color: #0f172a;
+        }
+        
         @media (max-width: 768px) {
             .mobile-only { display: block; }
             .desktop-hide { display: none; }
@@ -47,11 +120,12 @@
             }
         }
         .form-label {
-            color: white;
+            color: var(--finchest-text);
         }       
         .card-title {
-            color: white;
+            color: var(--finchest-text);
         }
+        
         /* Toast notification styles */
         .toast-container {
             position: fixed;
@@ -60,16 +134,17 @@
             z-index: 1100;
         }
         .toast.success {
-            background: linear-gradient(135deg, #28a745, #20c997);
+            background: linear-gradient(135deg, var(--finchest-teal) 0%, #22c55e 100%);
         }
         .toast.error {
             background: linear-gradient(135deg, #dc3545, #ff6b6b);
         }
+        
         /* Offline indicator */
         .offline-banner {
             display: none;
-            background: linear-gradient(135deg, #ff9800, #ff5722);
-            color: white;
+            background: linear-gradient(135deg, var(--finchest-gold), #e67e22);
+            color: #0f172a;
             text-align: center;
             padding: 8px;
             font-weight: 500;
@@ -77,17 +152,19 @@
         .offline-banner.show {
             display: block;
         }
+        
         /* Pending sync indicator */
         .pending-sync {
             opacity: 0.7;
-            border-left: 3px solid #ff9800;
+            border-left: 3px solid var(--finchest-gold);
         }
+        
         /* Connection status indicator */
         .connection-status {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: rgba(30, 30, 30, 0.95);
+            background: rgba(15, 23, 42, 0.95);
             padding: 8px 16px;
             border-radius: 20px;
             display: flex;
@@ -95,7 +172,7 @@
             gap: 8px;
             font-size: 0.85rem;
             z-index: 1000;
-            border: 1px solid #444;
+            border: 1px solid rgba(74, 138, 128, 0.3);
         }
         .status-dot {
             width: 10px;
@@ -104,20 +181,27 @@
             background: #888;
         }
         .status-dot.connected {
-            background: #28a745;
-            box-shadow: 0 0 8px #28a745;
+            background: var(--finchest-teal);
+            box-shadow: 0 0 8px var(--finchest-teal);
         }
         .status-dot.disconnected {
             background: #dc3545;
             box-shadow: 0 0 8px #dc3545;
         }
         .status-dot.checking {
-            background: #ffc107;
+            background: var(--finchest-gold);
             animation: pulse 1s infinite;
         }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.4; }
+        }
+        
+        /* Accent colors for alerts */
+        .alert-success {
+            background: linear-gradient(135deg, rgba(74, 138, 128, 0.2) 0%, rgba(34, 197, 94, 0.2) 100%);
+            border: 1px solid var(--finchest-teal);
+            color: var(--finchest-text);
         }
     </style>
 
@@ -155,11 +239,11 @@
     </div>
 
     <!-- Responsive Navbar -->
-    <nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4 border-bottom border-secondary">
+    <nav class="navbar navbar-expand-md navbar-dark mb-4">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="/">
-                <i class="bi bi-wallet me-2"></i>
-                Expense Tracker
+                <img src="/static/logo.png" alt="Finchest" height="36" class="me-2">
+                <span>Finchest</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                     aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">

@@ -1,6 +1,8 @@
-# Expense Tracker - Separate Frontend & Backend
+# Finchest - Your Personal Finance Chest
 
-A personal expense and savings tracker with **separate frontend and backend deployments**, **TOTP 2FA authentication**, and **instant offline access**.
+A personal expense and savings tracker with **offline-first PWA**, **TOTP 2FA authentication**, and **beautiful dark theme**.
+
+![Finchest Logo](static/logo.png)
 
 ## 🏗️ Architecture
 
@@ -22,10 +24,12 @@ A personal expense and savings tracker with **separate frontend and backend depl
 
 - **🔐 TOTP 2FA**: Secure login with Google/Microsoft Authenticator
 - **🚀 Instant Loading**: Cached data shows immediately, API updates in background
-- **📱 Offline Mode**: Add entries offline, auto-sync when connected
-- **📅 Month-Based Cache**: Auto-clears previous month's data
-- **🌙 Dark Theme**: Beautiful modern dark UI
+- **📱 PWA Support**: Install on mobile home screen with app icon
+- **📴 Offline Mode**: Add entries offline, auto-sync when connected
+- **💰 Monthly Totals Caching**: View spending even when offline
+- **🌙 Dark Theme**: Navy blue and teal theme matching the Finchest brand
 - **📊 Reports**: Filter by category, payment mode, date range
+- **🇮🇳 IST Timezone**: All timestamps in Indian Standard Time
 
 ## 🚀 Quick Start
 
@@ -113,19 +117,29 @@ Sessions expire after **7 days**.
 3. Setup your authenticator app:
    - Visit `https://your-backend-url/api/totp-setup` (requires login) to scan QR code
    - OR manually add in Google/Microsoft Authenticator:
-     - **Account**: Expense Tracker
+     - **Account**: Finchest
      - **Secret**: (your TOTP_SECRET)
      - **Type**: Time-based
 
 ## 📁 Project Structure
 
 ```
-expense_tracker/
+finchest/
 ├── app.py              # Flask backend
 ├── api.py              # REST API with JWT + TOTP auth
 ├── config.py           # Backend config
-├── requirements.txt    # Python dependencies (includes pyotp, qrcode)
+├── requirements.txt    # Python dependencies
 ├── .env                # Backend secrets (not in git)
+│
+├── static/             # PWA assets
+│   ├── logo.png        # Finchest logo
+│   ├── icon-192.png    # PWA icon (192x192)
+│   ├── icon-512.png    # PWA icon (512x512)
+│   ├── manifest.json   # PWA manifest
+│   ├── offline.js      # IndexedDB + offline support
+│   └── sw.js           # Service worker
+│
+├── templates/          # Flask HTML templates
 │
 └── frontend/           # Next.js frontend
     ├── src/
@@ -166,6 +180,15 @@ expense_tracker/
 ## ⚡ Performance Features
 
 - **Cache-first loading**: Reports show cached data instantly
+- **Monthly totals caching**: View spending stats even offline
 - **Background refresh**: API data fetched silently without blocking UI
 - **2-second health check timeout**: Fast offline detection
 - **Month-based cache expiry**: Auto-clears old data when month changes
+- **IST timezone**: All timestamps in Indian Standard Time (UTC+5:30)
+
+## 📱 PWA Installation
+
+1. Open Finchest in Chrome/Safari on mobile
+2. Tap "Add to Home Screen"
+3. The Finchest logo will appear as your app icon
+4. Launch like a native app!

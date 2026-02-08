@@ -3,8 +3,9 @@
 <h2 class="mb-4 fw-bold">Expense Report</h2>
 
 <!-- Current Month Total -->
-<div class="alert alert-dark alert-dark mb-4">
-    Total Spent in {{ current_month }}: ₹{{ "%.2f"|format(current_month_total) }}
+<div class="alert alert-dark mb-4" id="monthlyTotalAlert">
+    <span id="monthlyTotalText">Total Spent in {{ current_month }}: ₹{{ "%.2f"|format(current_month_total) }}</span>
+    <span id="pendingIndicator" class="badge bg-warning text-dark ms-2" style="display: none;">+ Pending</span>
 </div>
 
 <!-- Search Box -->
@@ -156,6 +157,48 @@ document.getElementById('searchInput').addEventListener('input', function() {
             row.style.display = 'none';
         }
     });
+});
+
+// Offline monthly totals handling
+async function loadCachedMonthlyTotals() {
+    if (!window.OfflineDB) return;
+    
+    try {
+        const cached = await window.OfflineDB.getCachedMonthlyTotals();
+        if (cached) {
+            const totalText = document.getElementById('monthlyTotalText');
+            const pendingIndicator = document.getElementById('pendingIndicator');
+            
+            // Update the display with cached data
+            if (!navigator.onLine || cached.hasPending) {
+                const monthName = cached.currentMonth || new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+                totalText.textContent = `Total Spent in ${monthName}: ₹${cached.monthExpenses.toFixed(2)}`;
+                
+                if (cached.hasPending) {
+                    pendingIndicator.style.display = 'inline';
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Finchest: Error loading cached monthly totals', error);
+    }
+}
+
+// Listen for offline data updates
+window.addEventListener('offlineDataUpdated', function(event) {
+    if (event.detail.type === 'expense') {
+        loadCachedMonthlyTotals();
+    }
+});
+
+// Listen for monthly totals updates from service worker
+window.addEventListener('monthlyTotalsUpdated', loadCachedMonthlyTotals);
+
+// Load cached data on page load if offline
+document.addEventListener('DOMContentLoaded', function() {
+    if (!navigator.onLine) {
+        loadCachedMonthlyTotals();
+    }
 });
 </script>
 {% endblock %}
