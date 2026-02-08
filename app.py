@@ -143,306 +143,48 @@ def generate_pie_chart(collection, group_field, chart_name, query=None):
     
 @app.route('/')
 def index():
-    return render_template('index.html')
+    """Redirect root to the Vercel frontend - Flask serves only API"""
+    return redirect(frontend_url)
 
 # @app.route('/')
 # def index():
 #     return render_template('base.html')
 
-# === EXPENSES ===
+# === EXPENSES - Redirects to Vercel frontend ===
 @app.route('/add_expense', methods=['GET', 'POST'])
 def add_expense():
-    current_date = get_ist_now().strftime('%Y-%m-%d')
-    if request.method == 'POST':
-        try:
-            amount = float(request.form['amount'])
-            category = request.form['category']
-            payment_mode = request.form['payment_mode']
-            date = datetime.strptime(request.form['date'], '%Y-%m-%d')
-            time = request.form.get('time', '').strip()
-
-            # If no time is provided, use current IST time
-            if not time:
-                time = get_ist_now().strftime('%H:%M')
-
-            note = request.form.get('note', '')
-
-            data = {
-                'amount': amount,
-                'category': category,
-                'payment_mode': payment_mode,
-                'date': date,
-                'time': time,
-                'note': note
-            }
-
-            expenses.insert_one(data)
-            flash('Expense added successfully!', 'success')
-            return redirect(url_for('add_expense'))
-
-        except Exception as e:
-            flash(f'Error adding expense: {str(e)}', 'error')
-            return redirect(url_for('add_expense'))
-
-    return render_template('add_expense.html', current_date=current_date)
-
+    return redirect(f"{frontend_url}/expenses/add")
 
 @app.route('/edit_expense/<id>', methods=['GET', 'POST'])
 def edit_expense(id):
-    exp = expenses.find_one({'_id': ObjectId(id)})
-    exp['date_str'] = exp['date'].strftime('%Y-%m-%d')
-    current_date = get_ist_now().strftime('%Y-%m-%d')
-
-    if request.method == 'POST':
-        try:
-            updated = {
-                'amount': float(request.form['amount']),
-                'category': request.form['category'],
-                'payment_mode': request.form['payment_mode'],
-                'date': datetime.strptime(request.form['date'], '%Y-%m-%d'),
-                'time': request.form.get('time', ''),
-                'note': request.form.get('note', '')
-            }
-            expenses.update_one({'_id': ObjectId(id)}, {'$set': updated})
-            flash('Expense updated successfully!', 'success')
-            return redirect(url_for('expense_report'))
-        except Exception as e:
-            flash(f'Error updating expense: {str(e)}', 'error')
-            return redirect(url_for('edit_expense', id=id))
-
-    return render_template('edit_expense.html', expense=exp, current_date=current_date)
+    return redirect(f"{frontend_url}/expenses/edit/{id}")
 
 @app.route('/delete_expense/<id>')
 def delete_expense(id):
-    try:
-        expenses.delete_one({'_id': ObjectId(id)})
-        flash('Expense deleted successfully!', 'success')
-    except Exception as e:
-        flash(f'Error deleting expense: {str(e)}', 'error')
-    return redirect(url_for('expense_report'))
-
-
-# @app.route('/expense_report')
-# def expense_report():
-#     all_expenses = list(expenses.find().sort('date', -1))
-#     generate_chart(expenses, 'category', 'expense_chart')
-#     return render_template('expense_report.html', expenses=all_expenses, chart='expense_chart.png')
+    return redirect(f"{frontend_url}/expenses")
 
 @app.route('/expense_report')
 def expense_report():
-    query = {}
+    return redirect(f"{frontend_url}/expenses")
 
-    month = request.args.get('month')
-    year = request.args.get('year')
-    category = request.args.get('category')
-    payment_mode = request.args.get('payment_mode')
-    from_date = request.args.get('from_date')
-    to_date = request.args.get('to_date')
 
-    # Build year list for dropdown (last 5 years)
-    current_year = get_ist_now().year
-    years_list = list(range(current_year, current_year - 5, -1))
 
-    # Default year to current if month selected but year not specified
-    if month and not year:
-        year = str(current_year)
-
-    # Month + Year filter
-    if month:
-        try:
-            month_num = datetime.strptime(month, '%B').month
-            selected_year = int(year) if year else current_year
-            start = datetime(selected_year, month_num, 1)
-            if month_num == 12:
-                next_start = datetime(selected_year + 1, 1, 1)
-            else:
-                next_start = datetime(selected_year, month_num + 1, 1)
-            query['date'] = {'$gte': start, '$lt': next_start}
-        except ValueError:
-            pass
-
-    # Date range filter (overrides month filter if both provided)
-    if from_date and to_date:
-        query['date'] = {
-            '$gte': datetime.strptime(from_date, '%Y-%m-%d'),
-            '$lte': datetime.strptime(to_date, '%Y-%m-%d')
-        }
-
-    if category:
-        query['category'] = category
-
-    if payment_mode:
-        query['payment_mode'] = payment_mode
-
-    # Fetch filtered expenses
-    filtered_expenses = list(expenses.find(query).sort([("date", -1), ("time", -1)]))
-    total_filtered = sum(e['amount'] for e in filtered_expenses)
-
-    categories = expenses.distinct('category')
-    payment_modes = expenses.distinct('payment_mode')
-
-    # Generate pie chart with filtered query
-    generate_pie_chart(expenses, 'category', 'expense_chart', query)
-
-    # Calculate current month total
-    now = get_ist_now()
-    current_month = now.strftime('%B')
-    start = datetime(now.year, now.month, 1)
-    next_start = start_of_next_month(now)
-    current_month_query = {'date': {'$gte': start, '$lt': next_start}}
-    current_month_total = sum(e['amount'] for e in expenses.find(current_month_query))
-
-    return render_template(
-        'expense_report.html',
-        expenses=filtered_expenses,
-        chart='expense_chart.png',
-        categories=categories,
-        payment_modes=payment_modes,
-        current_month=current_month,
-        current_month_total=current_month_total,
-        total_filtered=total_filtered,
-        years_list=years_list,
-        selected_year=year
-    )
-
-# === SAVINGS ===
+# === SAVINGS - Redirects to Vercel frontend ===
 @app.route('/add_saving', methods=['GET', 'POST'])
 def add_saving():
-    current_date = get_ist_now().strftime('%Y-%m-%d')
-    if request.method == 'POST':
-        try:
-            amount = float(request.form['amount'])
-            saving_mode = request.form['saving_mode']
-            date = datetime.strptime(request.form['date'], '%Y-%m-%d')
-            time = request.form.get('time', '').strip()
-            if not time:
-                time = get_ist_now().strftime('%H:%M')
-            note = request.form.get('note', '')
-
-            data = {
-                'amount': amount,
-                'saving_mode': saving_mode,
-                'date': date,
-                'time': time,
-                'note': note
-            }
-
-            savings.insert_one(data)
-            flash('Saving added successfully!', 'success')
-            return redirect(url_for('saving_report'))
-        except Exception as e:
-            flash(f'Error adding saving: {str(e)}', 'error')
-            return redirect(url_for('add_saving'))
-
-    return render_template('add_saving.html', current_date=current_date)
-
+    return redirect(f"{frontend_url}/savings/add")
 
 @app.route('/edit_saving/<id>', methods=['GET', 'POST'])
 def edit_saving(id):
-    saving = savings.find_one({'_id': ObjectId(id)})
-    
-    if request.method == 'POST':
-        try:
-            updated = {
-                'amount': float(request.form['amount']),
-                'saving_mode': request.form['saving_mode'],
-                'date': datetime.strptime(request.form['date'], '%Y-%m-%d'),
-                'time': request.form.get('time', ''),
-                'note': request.form.get('note', '')
-            }
-            savings.update_one({'_id': ObjectId(id)}, {'$set': updated})
-            flash('Saving updated successfully!', 'success')
-            return redirect(url_for('saving_report'))
-        except Exception as e:
-            flash(f'Error updating saving: {str(e)}', 'error')
-            return redirect(url_for('edit_saving', id=id))
-
-    saving['date_str'] = saving['date'].strftime('%Y-%m-%d')
-    return render_template('edit_saving.html', saving=saving)
+    return redirect(f"{frontend_url}/savings/edit/{id}")
 
 @app.route('/delete_saving/<id>')
 def delete_saving(id):
-    try:
-        savings.delete_one({'_id': ObjectId(id)})
-        flash('Saving deleted successfully!', 'success')
-    except Exception as e:
-        flash(f'Error deleting saving: {str(e)}', 'error')
-    return redirect(url_for('saving_report'))
-
+    return redirect(f"{frontend_url}/savings")
 
 @app.route('/saving_report')
 def saving_report():
-    query = {}
-
-    month = request.args.get('month')
-    year = request.args.get('year')
-    mode = request.args.get('saving_mode')
-    from_date = request.args.get('from_date')
-    to_date = request.args.get('to_date')
-
-    # Build year list for dropdown (last 5 years)
-    current_year = get_ist_now().year
-    years_list = list(range(current_year, current_year - 5, -1))
-
-    # Default year to current if month selected but year not specified
-    if month and not year:
-        year = str(current_year)
-
-    # Month + Year filter
-    if month:
-        try:
-            month_num = datetime.strptime(month, '%B').month
-            selected_year = int(year) if year else current_year
-            start = datetime(selected_year, month_num, 1)
-            if month_num == 12:
-                next_start = datetime(selected_year + 1, 1, 1)
-            else:
-                next_start = datetime(selected_year, month_num + 1, 1)
-            query['date'] = {'$gte': start, '$lt': next_start}
-        except ValueError:
-            pass
-
-    # Date range filter (overrides month filter if both provided)
-    if from_date and to_date:
-        query['date'] = {
-            '$gte': datetime.strptime(from_date, '%Y-%m-%d'),
-            '$lte': datetime.strptime(to_date, '%Y-%m-%d')
-        }
-
-    if mode:
-        query['saving_mode'] = mode
-
-    # Fetch filtered savings
-    filtered_savings = list(savings.find(query).sort([("date", -1), ("time", -1)]))
-    total_filtered = sum(e['amount'] for e in filtered_savings)
-
-    modes = savings.distinct('saving_mode')
-
-    # Generate pie chart with filtered query
-    generate_pie_chart(savings, 'saving_mode', 'saving_chart', query)
-
-    # Calculate current month total
-    now = get_ist_now()
-    current_month = now.strftime('%B')
-    start = datetime(now.year, now.month, 1)
-    next_start = start_of_next_month(now)
-    current_month_query = {'date': {'$gte': start, '$lt': next_start}}
-
-    current_month_total = sum(e['amount'] for e in savings.find(current_month_query))
-    total_saved = sum(e['amount'] for e in savings.find())
-
-    return render_template(
-        'saving_report.html',
-        savings=filtered_savings,
-        chart='saving_chart.png',
-        modes=modes,
-        current_month=current_month,
-        current_month_total=current_month_total,
-        total_filtered=total_filtered,
-        total_saved=total_saved,
-        years_list=years_list,
-        selected_year=year
-    )
+    return redirect(f"{frontend_url}/savings")
 
 
 # @app.route('/')
