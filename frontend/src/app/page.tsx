@@ -43,9 +43,16 @@ export default function HomePage() {
     <ProtectedLayout>
       <div className="text-center my-4">
         <div className="mb-4">
-          <Image src="/logo.png" alt="Finchest" width={80} height={80} className="mb-3" />
-          <h1 className="fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
-          <p className="text-muted">Your Personal Finance Chest</p>
+          <Image
+            src="/logo.png"
+            alt="Finchest"
+            width={120}
+            height={120}
+            className="mb-3"
+            style={{ borderRadius: '16px' }}
+          />
+          <h1 className="display-5 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
+          <p className="text-secondary fs-5">Your Personal Finance Chest</p>
         </div>
         <div className="row g-3 justify-content-center">
           {buttons.map((btn) => (
