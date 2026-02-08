@@ -43,24 +43,14 @@ export default function HomePage() {
     <ProtectedLayout>
       <div className="text-center my-5">
         <div className="mb-4">
-          {/* Logo with white circular background */}
-          <div
-            className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3 shadow"
-            style={{
-              backgroundColor: 'white',
-              width: '140px',
-              height: '140px',
-              overflow: 'hidden'
-            }}
-          >
-            <Image
-              src="/logo.png"
-              alt="Finchest"
-              width={400}
-              height={400}
-              style={{ objectFit: 'cover' }}
-            />
-          </div>
+          {/* Logo - already has white background */}
+          <Image
+            src="/logo.png"
+            alt="Finchest"
+            width={150}
+            height={150}
+            className="mb-3"
+          />
           <h1 className="display-4 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
           <p className="text-secondary fs-5">Your Personal Finance Chest</p>
         </div>

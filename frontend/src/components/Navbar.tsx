@@ -30,9 +30,7 @@ export default function Navbar() {
             <nav className="navbar navbar-dark" style={{ backgroundColor: '#1a365d', borderBottom: '1px solid #4a8a80' }}>
                 <div className="container d-flex justify-content-between align-items-center py-2">
                     <Link className="navbar-brand d-flex align-items-center text-white text-decoration-none" href="/" onClick={closeMenu}>
-                        <div className="d-inline-flex align-items-center justify-content-center rounded-circle me-2" style={{ backgroundColor: 'white', width: '40px', height: '40px', overflow: 'hidden' }}>
-                            <Image src="/logo.png" alt="Finchest" width={100} height={100} style={{ objectFit: 'cover' }} />
-                        </div>
+                        <Image src="/logo.png" alt="Finchest" width={36} height={36} className="me-2 rounded-circle" />
                         <span style={{ fontWeight: 600 }}>Finchest</span>
                     </Link>
 
