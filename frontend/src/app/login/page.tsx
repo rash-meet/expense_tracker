@@ -49,14 +49,18 @@ function LoginForm() {
                 <div className="row justify-content-center">
                     <div className="col-12 col-md-6 col-lg-4">
                         <div className="text-center mb-4">
-                            <Image
-                                src="/logo.png"
-                                alt="Finchest"
-                                width={100}
-                                height={100}
-                                className="mb-3"
-                                style={{ borderRadius: '12px' }}
-                            />
+                            <div
+                                className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3 shadow"
+                                style={{ backgroundColor: 'white', width: '120px', height: '120px', overflow: 'hidden' }}
+                            >
+                                <Image
+                                    src="/logo.png"
+                                    alt="Finchest"
+                                    width={350}
+                                    height={350}
+                                    style={{ objectFit: 'cover' }}
+                                />
+                            </div>
                             <h1 className="h2 mt-2 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
                             <p className="text-secondary">Your Personal Finance Chest</p>
                         </div>
