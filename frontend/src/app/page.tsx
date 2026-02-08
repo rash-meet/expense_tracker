@@ -43,13 +43,22 @@ export default function HomePage() {
     <ProtectedLayout>
       <div className="text-center my-5">
         <div className="mb-4">
-          {/* Logo with white circular background like Flask UI */}
-          <div className="d-inline-block p-4 rounded-circle mb-3" style={{ backgroundColor: 'white' }}>
+          {/* Logo with white circular background - EXACT Flask match */}
+          <div
+            className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3 shadow"
+            style={{
+              backgroundColor: 'white',
+              width: '180px',
+              height: '180px',
+              padding: '20px'
+            }}
+          >
             <Image
               src="/logo.png"
               alt="Finchest"
-              width={120}
-              height={120}
+              width={140}
+              height={140}
+              style={{ objectFit: 'contain' }}
             />
           </div>
           <h1 className="display-4 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
