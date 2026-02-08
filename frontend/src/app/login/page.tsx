@@ -52,8 +52,8 @@ function LoginForm() {
                             <Image
                                 src="/logo.png"
                                 alt="Finchest"
-                                width={120}
-                                height={120}
+                                width={150}
+                                height={150}
                                 className="mb-3"
                             />
                             <h1 className="h2 mt-2 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>

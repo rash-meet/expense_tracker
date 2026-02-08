@@ -42,16 +42,16 @@ export default function HomePage() {
   return (
     <ProtectedLayout>
       <div className="text-center my-5">
-        <div className="mb-4">
-          {/* Logo - already has white background */}
+        <div className="mb-4 d-flex flex-column align-items-center">
+          {/* Logo - centered and bigger */}
           <Image
             src="/logo.png"
             alt="Finchest"
-            width={150}
-            height={150}
+            width={200}
+            height={200}
             className="mb-3"
           />
-          <h1 className="display-4 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
+          <h1 className="display-3 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
           <p className="text-secondary fs-5">Your Personal Finance Chest</p>
         </div>
         <div className="row g-3 justify-content-center">
