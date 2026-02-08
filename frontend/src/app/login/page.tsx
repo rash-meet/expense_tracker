@@ -2,6 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { login } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -43,17 +44,24 @@ function LoginForm() {
     };
 
     return (
-        <div className="min-vh-100 d-flex align-items-center justify-content-center bg-dark">
+        <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: '#0f172a' }}>
             <div className="container">
                 <div className="row justify-content-center">
                     <div className="col-12 col-md-6 col-lg-4">
                         <div className="text-center mb-4">
-                            <i className="bi bi-wallet2 display-1 text-primary"></i>
-                            <h1 className="h3 mt-3 text-white">Expense Tracker</h1>
-                            <p className="text-muted">Sign in to continue</p>
+                            <Image
+                                src="/logo.png"
+                                alt="Finchest"
+                                width={100}
+                                height={100}
+                                className="mb-3"
+                                style={{ borderRadius: '12px' }}
+                            />
+                            <h1 className="h2 mt-2 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
+                            <p className="text-secondary">Your Personal Finance Chest</p>
                         </div>
 
-                        <div className="card card-dark shadow" style={{ backgroundColor: '#1f1f1f', border: 'none' }}>
+                        <div className="card shadow" style={{ backgroundColor: '#1e293b', border: '1px solid #4a8a80' }}>
                             <div className="card-body p-4">
                                 {isExpired && !error && (
                                     <div className="alert alert-warning d-flex align-items-center" role="alert">
