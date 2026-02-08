@@ -48,17 +48,17 @@ export default function HomePage() {
             className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3 shadow"
             style={{
               backgroundColor: 'white',
-              width: '180px',
-              height: '180px',
-              padding: '20px'
+              width: '160px',
+              height: '160px',
+              overflow: 'hidden'
             }}
           >
             <Image
               src="/logo.png"
               alt="Finchest"
-              width={140}
-              height={140}
-              style={{ objectFit: 'contain' }}
+              width={300}
+              height={300}
+              style={{ objectFit: 'cover' }}
             />
           </div>
           <h1 className="display-4 fw-bold" style={{ color: '#4a8a80' }}>Finchest</h1>
