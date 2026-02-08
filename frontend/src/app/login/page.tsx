@@ -48,7 +48,7 @@ function LoginForm() {
             <div className="container">
                 <div className="row justify-content-center">
                     <div className="col-12 col-md-6 col-lg-4">
-                        <div className="text-center mb-4">
+                        <div className="text-center mb-4 d-flex flex-column align-items-center">
                             <Image
                                 src="/logo.png"
                                 alt="Finchest"
