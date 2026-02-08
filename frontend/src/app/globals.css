@@ -1,17 +1,24 @@
 @import "tailwindcss";
 
-/* Finchest - Dark theme with navy blue and teal accents */
+/* ======================================================
+   FINCHEST - Matching Flask UI CSS
+   Clean, elegant dark theme with gradients
+   ====================================================== */
+
 :root {
   --finchest-navy: #0f172a;
   --finchest-navy-light: #1e293b;
-  --finchest-primary: #1a365d;
-  --finchest-accent: #4a8a80;
-  --finchest-gold: #d4a574;
+  --finchest-blue: #1a365d;
+  --finchest-teal: #4a8a80;
+  --finchest-teal-light: #5fb3a5;
+  --finchest-gold: #d4a853;
+  --finchest-text: #f1f5f9;
+  --finchest-text-muted: #94a3b8;
 }
 
 body {
   background-color: var(--finchest-navy) !important;
-  color: #f8f9fa !important;
+  color: var(--finchest-text) !important;
 }
 
 .bg-custom {
@@ -20,10 +27,10 @@ body {
 
 .card-dark {
   background-color: var(--finchest-navy-light) !important;
-  border: 1px solid var(--finchest-accent) !important;
+  border: 1px solid rgba(74, 138, 128, 0.2) !important;
 }
 
-/* Force dark theme on all form inputs */
+/* ======== FORM STYLING ======== */
 .form-control,
 .form-select,
 input[type="text"],
@@ -34,9 +41,9 @@ input[type="password"],
 input[type="email"],
 select,
 textarea {
-  background-color: #2d2d2d !important;
+  background-color: #1e293b !important;
   color: #fff !important;
-  border: 1px solid #444 !important;
+  border: 1px solid rgba(74, 138, 128, 0.3) !important;
 }
 
 .form-control:focus,
@@ -44,10 +51,10 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  background-color: #2d2d2d !important;
+  background-color: #1e293b !important;
   color: #fff !important;
-  border-color: #666 !important;
-  box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25) !important;
+  border-color: var(--finchest-teal) !important;
+  box-shadow: 0 0 0 0.2rem rgba(74, 138, 128, 0.25) !important;
 }
 
 /* Fix date and time input icons */
@@ -61,75 +68,52 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
 }
 
-/* Table styles */
-.table-dark {
-  --bs-table-bg: #1f1f1f;
-  --bs-table-striped-bg: #2a2a2a;
-  --bs-table-hover-bg: #333;
-}
-
-/* Table header text visibility */
-.table thead th,
-.table-dark thead th,
-table thead th {
-  color: #fff !important;
-  background-color: #343a40 !important;
-}
-
-.alert-dark {
-  background-color: #2a2a2a !important;
-  color: #f8f9fa !important;
-}
-
-/* Placeholder text styling - IMPORTANT for visibility */
+/* Placeholder text styling */
 ::placeholder {
-  color: #9ca3af !important;
+  color: #94a3b8 !important;
   opacity: 1 !important;
 }
 
 ::-webkit-input-placeholder {
-  color: #9ca3af !important;
+  color: #94a3b8 !important;
   opacity: 1 !important;
 }
 
 ::-moz-placeholder {
-  color: #9ca3af !important;
+  color: #94a3b8 !important;
   opacity: 1 !important;
-}
-
-:-ms-input-placeholder {
-  color: #9ca3af !important;
-  opacity: 1 !important;
-}
-
-/* Ensure form inputs have visible placeholder */
-.form-control::placeholder,
-.form-select::placeholder,
-input::placeholder,
-textarea::placeholder {
-  color: #9ca3af !important;
-  opacity: 1 !important;
-}
-
-/* Search input specific */
-input[type="search"],
-.search-input {
-  background-color: #2d2d2d !important;
-  color: #fff !important;
-  border: 1px solid #444 !important;
 }
 
 .form-label {
-  color: white !important;
+  color: var(--finchest-text) !important;
 }
 
 .card-title {
-  color: white !important;
+  color: var(--finchest-text) !important;
 }
 
-/* Navbar styling - Finchest navy theme */
+/* ======== NAVBAR STYLING - Gradient like Flask ======== */
 .navbar {
-  background-color: var(--finchest-primary) !important;
+  background: linear-gradient(135deg, var(--finchest-blue) 0%, var(--finchest-navy) 100%) !important;
+  border-bottom: 1px solid rgba(74, 138, 128, 0.3) !important;
+}
+
+.navbar-brand {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.navbar-brand img {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.nav-link {
+  color: var(--finchest-text-muted) !important;
+  transition: color 0.2s ease;
+}
+
+.nav-link:hover {
+  color: var(--finchest-teal-light) !important;
 }
 
 .navbar-toggler {
@@ -140,11 +124,119 @@ input[type="search"],
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
 }
 
-/* Offline indicator */
+/* ======== BUTTON STYLING - Gradients like Flask ======== */
+.btn-primary {
+  background: linear-gradient(135deg, var(--finchest-teal) 0%, #3d7a70 100%) !important;
+  border: none !important;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--finchest-teal-light) 0%, var(--finchest-teal) 100%) !important;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+  border: none !important;
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #2dd470 0%, #22c55e 100%) !important;
+}
+
+.btn-info {
+  background: linear-gradient(135deg, var(--finchest-blue) 0%, #15425e 100%) !important;
+  border: none !important;
+  color: white !important;
+}
+
+.btn-info:hover {
+  background: linear-gradient(135deg, #1e4976 0%, var(--finchest-blue) 100%) !important;
+  color: white !important;
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, var(--finchest-gold) 0%, #c49a47 100%) !important;
+  border: none !important;
+  color: #0f172a !important;
+}
+
+.btn-warning:hover {
+  background: linear-gradient(135deg, #e0b45a 0%, var(--finchest-gold) 100%) !important;
+  color: #0f172a !important;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+  border: none !important;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #e74c5c 0%, #dc3545 100%) !important;
+}
+
+.btn-outline-warning {
+  border-color: var(--finchest-gold) !important;
+  color: var(--finchest-gold) !important;
+}
+
+.btn-outline-warning:hover {
+  background: var(--finchest-gold) !important;
+  color: #0f172a !important;
+}
+
+.btn-outline-danger {
+  border-color: #dc3545 !important;
+  color: #dc3545 !important;
+}
+
+.btn-outline-danger:hover {
+  background: #dc3545 !important;
+  color: white !important;
+}
+
+/* ======== TABLE STYLING ======== */
+.table-dark {
+  --bs-table-bg: var(--finchest-navy-light);
+  --bs-table-striped-bg: #243447;
+  --bs-table-hover-bg: #2d4156;
+}
+
+.table thead th,
+.table-dark thead th,
+table thead th {
+  color: #fff !important;
+  background-color: #243447 !important;
+  border-color: rgba(74, 138, 128, 0.3) !important;
+}
+
+.table {
+  color: var(--finchest-text) !important;
+}
+
+.table td,
+.table th {
+  color: var(--finchest-text) !important;
+  border-color: rgba(74, 138, 128, 0.2) !important;
+}
+
+/* ======== ALERT STYLING ======== */
+.alert-dark {
+  background-color: var(--finchest-navy-light) !important;
+  color: var(--finchest-text) !important;
+  border: 1px solid rgba(74, 138, 128, 0.3) !important;
+}
+
+.alert-info {
+  background-color: rgba(26, 54, 93, 0.5) !important;
+  color: var(--finchest-text) !important;
+  border: 1px solid rgba(74, 138, 128, 0.3) !important;
+}
+
+/* ======== OFFLINE INDICATOR ======== */
 .offline-banner {
   display: none;
-  background: linear-gradient(135deg, #ff9800, #ff5722);
-  color: white;
+  background: linear-gradient(135deg, var(--finchest-gold), #e67e22);
+  color: #0f172a;
   text-align: center;
   padding: 8px;
   font-weight: 500;
@@ -154,12 +246,12 @@ input[type="search"],
   display: block;
 }
 
-/* Connection status indicator */
+/* ======== CONNECTION STATUS ======== */
 .connection-status {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: rgba(30, 30, 30, 0.95);
+  background: rgba(30, 41, 59, 0.95);
   padding: 8px 16px;
   border-radius: 20px;
   display: flex;
@@ -167,7 +259,7 @@ input[type="search"],
   gap: 8px;
   font-size: 0.85rem;
   z-index: 1000;
-  border: 1px solid #444;
+  border: 1px solid rgba(74, 138, 128, 0.3);
 }
 
 .status-dot {
@@ -178,8 +270,8 @@ input[type="search"],
 }
 
 .status-dot.connected {
-  background: #28a745;
-  box-shadow: 0 0 8px #28a745;
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
 }
 
 .status-dot.disconnected {
@@ -188,7 +280,7 @@ input[type="search"],
 }
 
 .status-dot.checking {
-  background: #ffc107;
+  background: var(--finchest-gold);
   animation: pulse 1s infinite;
 }
 
@@ -204,48 +296,65 @@ input[type="search"],
   }
 }
 
-/* Pending sync indicator */
+/* ======== PENDING SYNC ======== */
 .pending-sync {
   opacity: 0.7;
-  border-left: 3px solid #ff9800;
+  border-left: 3px solid var(--finchest-gold);
 }
 
-/* Input group styling */
+/* ======== INPUT GROUP ======== */
 .input-group-text {
-  background-color: #1f1f1f !important;
-  color: #fff !important;
-  border: 1px solid #444 !important;
+  background-color: var(--finchest-navy-light) !important;
+  color: var(--finchest-text) !important;
+  border: 1px solid rgba(74, 138, 128, 0.3) !important;
 }
 
-/* Table text */
-.table {
-  color: #f8f9fa !important;
-}
-
-.table td,
-.table th {
-  color: #f8f9fa !important;
-  border-color: #444 !important;
-}
-
-/* List items */
+/* ======== LIST & DROPDOWN ======== */
 .list-group-item {
-  background-color: #1f1f1f !important;
-  color: #f8f9fa !important;
-  border-color: #444 !important;
+  background-color: var(--finchest-navy-light) !important;
+  color: var(--finchest-text) !important;
+  border-color: rgba(74, 138, 128, 0.2) !important;
 }
 
-/* Dropdown menus */
 .dropdown-menu {
-  background-color: #1f1f1f !important;
-  border-color: #444 !important;
+  background-color: var(--finchest-navy-light) !important;
+  border-color: rgba(74, 138, 128, 0.3) !important;
 }
 
 .dropdown-item {
-  color: #f8f9fa !important;
+  color: var(--finchest-text) !important;
 }
 
 .dropdown-item:hover {
-  background-color: #2d2d2d !important;
+  background-color: rgba(74, 138, 128, 0.2) !important;
   color: #fff !important;
+}
+
+/* ======== SCROLLBAR STYLING ======== */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--finchest-navy);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--finchest-teal);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--finchest-teal-light);
+}
+
+/* ======== RESPONSIVE ======== */
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block;
+  }
+
+  .desktop-hide {
+    display: none;
+  }
 }
