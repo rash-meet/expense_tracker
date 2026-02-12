@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getSettings, updateSettings, Settings } from '@/lib/api';
+import { getSettings, updateSettings, Settings, checkHealth } from '@/lib/api';
 import ProtectedLayout from '@/components/ProtectedLayout';
 
 export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [isOnline, setIsOnline] = useState(true);
     const [categories, setCategories] = useState<string[]>([]);
     const [paymentModes, setPaymentModes] = useState<string[]>([]);
     const [savingModes, setSavingModes] = useState<string[]>([]);
@@ -23,6 +24,8 @@ export default function SettingsPage() {
 
     const loadSettings = async () => {
         setLoading(true);
+        const healthy = await checkHealth();
+        setIsOnline(healthy);
         try {
             const settings = await getSettings();
             if (settings) {
@@ -210,7 +213,7 @@ export default function SettingsPage() {
                                     <button
                                         className="btn btn-sm btn-outline-warning me-2"
                                         onClick={() => startEdit(section, idx, item)}
-                                        disabled={saving}
+                                        disabled={saving || !isOnline}
                                         title="Edit"
                                     >
                                         <i className="bi bi-pencil"></i>
@@ -218,7 +221,7 @@ export default function SettingsPage() {
                                     <button
                                         className="btn btn-sm btn-outline-danger"
                                         onClick={() => onDelete(idx)}
-                                        disabled={saving}
+                                        disabled={saving || !isOnline}
                                         title="Delete"
                                     >
                                         <i className="bi bi-trash"></i>
@@ -244,6 +247,13 @@ export default function SettingsPage() {
                     style={{ backgroundColor: '#0f4c75', borderColor: '#4a8a80', color: '#e2e8f0' }}>
                     {toastMsg}
                     <button type="button" className="btn-close" onClick={() => setToastMsg('')}></button>
+                </div>
+            )}
+
+            {!isOnline && (
+                <div className="alert alert-warning mb-4">
+                    <i className="bi bi-wifi-off me-2"></i>
+                    <strong>You are offline.</strong> Settings are shown from cache. Editing requires an internet connection.
                 </div>
             )}
 
@@ -274,7 +284,7 @@ export default function SettingsPage() {
                                         onKeyDown={(e) => e.key === 'Enter' && addCategory()}
                                         style={{ backgroundColor: '#1e293b', color: '#e2e8f0', border: '1px solid #4a8a80' }}
                                     />
-                                    <button className="btn btn-outline-success" onClick={addCategory} disabled={saving || !newCategory.trim()}>
+                                    <button className="btn btn-outline-success" onClick={addCategory} disabled={saving || !newCategory.trim() || !isOnline}>
                                         <i className="bi bi-plus-lg"></i>
                                     </button>
                                 </div>
@@ -301,7 +311,7 @@ export default function SettingsPage() {
                                         onKeyDown={(e) => e.key === 'Enter' && addPaymentMode()}
                                         style={{ backgroundColor: '#1e293b', color: '#e2e8f0', border: '1px solid #4a8a80' }}
                                     />
-                                    <button className="btn btn-outline-success" onClick={addPaymentMode} disabled={saving || !newPaymentMode.trim()}>
+                                    <button className="btn btn-outline-success" onClick={addPaymentMode} disabled={saving || !newPaymentMode.trim() || !isOnline}>
                                         <i className="bi bi-plus-lg"></i>
                                     </button>
                                 </div>
@@ -328,7 +338,7 @@ export default function SettingsPage() {
                                         onKeyDown={(e) => e.key === 'Enter' && addSavingMode()}
                                         style={{ backgroundColor: '#1e293b', color: '#e2e8f0', border: '1px solid #4a8a80' }}
                                     />
-                                    <button className="btn btn-outline-success" onClick={addSavingMode} disabled={saving || !newSavingMode.trim()}>
+                                    <button className="btn btn-outline-success" onClick={addSavingMode} disabled={saving || !newSavingMode.trim() || !isOnline}>
                                         <i className="bi bi-plus-lg"></i>
                                     </button>
                                 </div>

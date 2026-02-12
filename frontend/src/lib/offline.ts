@@ -207,14 +207,30 @@ export async function updatePendingOfflineEntry(
 
 // Cache operations
 export async function cacheExpenses(expenses: Expense[]): Promise<void> {
+    // Preserve pending (unsynced) entries
+    const existing = await getAllFromStore<any>(STORES.EXPENSES);
+    const pendingEntries = existing.filter((e: any) => e._pending || e.synced === false);
     await clearStore(STORES.EXPENSES);
+    // Re-add pending entries first
+    for (const entry of pendingEntries) {
+        await addToStore(STORES.EXPENSES, entry);
+    }
+    // Then add synced entries
     for (const expense of expenses) {
         await addToStore(STORES.EXPENSES, { ...expense, synced: true });
     }
 }
 
 export async function cacheSavings(savings: Saving[]): Promise<void> {
+    // Preserve pending (unsynced) entries
+    const existing = await getAllFromStore<any>(STORES.SAVINGS);
+    const pendingEntries = existing.filter((e: any) => e._pending || e.synced === false);
     await clearStore(STORES.SAVINGS);
+    // Re-add pending entries first
+    for (const entry of pendingEntries) {
+        await addToStore(STORES.SAVINGS, entry);
+    }
+    // Then add synced entries
     for (const saving of savings) {
         await addToStore(STORES.SAVINGS, { ...saving, synced: true });
     }

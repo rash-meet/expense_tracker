@@ -258,17 +258,44 @@ export interface Settings {
     saving_modes: string[];
 }
 
+const SETTINGS_CACHE_KEY = 'finchest_settings_cache';
+
+function cacheSettingsLocally(settings: Settings): void {
+    try {
+        localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings));
+    } catch { /* ignore storage errors */ }
+}
+
+function getCachedSettings(): Settings | null {
+    try {
+        const cached = localStorage.getItem(SETTINGS_CACHE_KEY);
+        return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+}
+
 export async function getSettings(): Promise<Settings | null> {
-    const response = await apiRequest<Settings>('/api/settings');
-    if (response.success && response.data) {
-        return response.data;
-    }
-    return null;
+    try {
+        const response = await apiRequest<Settings>('/api/settings');
+        if (response.success && response.data) {
+            cacheSettingsLocally(response.data);
+            return response.data;
+        }
+    } catch { /* API unreachable — fall back to cache */ }
+    // Return cached settings if API fails
+    return getCachedSettings();
 }
 
 export async function updateSettings(settings: Partial<Settings>): Promise<ApiResponse<void>> {
-    return apiRequest('/api/settings', {
+    const result = await apiRequest<void>('/api/settings', {
         method: 'PUT',
         body: JSON.stringify(settings),
     });
+    // Update local cache with merged settings
+    if (result.success) {
+        const existing = getCachedSettings();
+        if (existing) {
+            cacheSettingsLocally({ ...existing, ...settings } as Settings);
+        }
+    }
+    return result;
 }
