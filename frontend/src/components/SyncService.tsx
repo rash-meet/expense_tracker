@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from 'react';
 import { checkHealth, addExpense, addSaving, updateExpense, updateSaving, deleteExpense, deleteSaving } from '@/lib/api';
-import { getPendingSyncItems, removeSyncItem } from '@/lib/offline';
+import { getPendingSyncItems, removeSyncItem, clearPendingFromStore } from '@/lib/offline';
 import { useAuth } from '@/lib/auth';
 
 export default function SyncService() {
@@ -80,6 +80,13 @@ export default function SyncService() {
         } catch (err) {
             console.error('[Sync] Error processing sync queue:', err);
         }
+
+        // After sync, clear any remaining pending entries from local stores
+        const remaining = await getPendingSyncItems();
+        const hasExpensePending = remaining.some(i => i.type === 'expense');
+        const hasSavingPending = remaining.some(i => i.type === 'saving');
+        if (!hasExpensePending) await clearPendingFromStore('expense');
+        if (!hasSavingPending) await clearPendingFromStore('saving');
 
         isSyncing.current = false;
     };

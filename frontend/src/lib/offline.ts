@@ -207,11 +207,14 @@ export async function updatePendingOfflineEntry(
 
 // Cache operations
 export async function cacheExpenses(expenses: Expense[]): Promise<void> {
-    // Preserve pending (unsynced) entries
+    // Check if there are pending sync items - only preserve pending entries if queue has items
+    const pendingSync = (await getPendingSyncItems()).filter(i => i.type === 'expense');
     const existing = await getAllFromStore<any>(STORES.EXPENSES);
-    const pendingEntries = existing.filter((e: any) => e._pending || e.synced === false);
+    const pendingEntries = pendingSync.length > 0
+        ? existing.filter((e: any) => e._pending || e.synced === false)
+        : []; // No pending sync items = clear all pending entries (they were synced)
     await clearStore(STORES.EXPENSES);
-    // Re-add pending entries first
+    // Re-add pending entries first (only if sync queue still has items)
     for (const entry of pendingEntries) {
         await addToStore(STORES.EXPENSES, entry);
     }
@@ -222,11 +225,14 @@ export async function cacheExpenses(expenses: Expense[]): Promise<void> {
 }
 
 export async function cacheSavings(savings: Saving[]): Promise<void> {
-    // Preserve pending (unsynced) entries
+    // Check if there are pending sync items - only preserve pending entries if queue has items
+    const pendingSync = (await getPendingSyncItems()).filter(i => i.type === 'saving');
     const existing = await getAllFromStore<any>(STORES.SAVINGS);
-    const pendingEntries = existing.filter((e: any) => e._pending || e.synced === false);
+    const pendingEntries = pendingSync.length > 0
+        ? existing.filter((e: any) => e._pending || e.synced === false)
+        : []; // No pending sync items = clear all pending entries (they were synced)
     await clearStore(STORES.SAVINGS);
-    // Re-add pending entries first
+    // Re-add pending entries first (only if sync queue still has items)
     for (const entry of pendingEntries) {
         await addToStore(STORES.SAVINGS, entry);
     }
@@ -237,23 +243,31 @@ export async function cacheSavings(savings: Saving[]): Promise<void> {
 }
 
 export async function getCachedExpenses(): Promise<Expense[]> {
-    const cached = await getAllFromStore<Expense>(STORES.EXPENSES);
-    const pending = (await getPendingSyncItems()).filter(i => i.type === 'expense');
-    const pendingData = pending.map(p => ({
-        ...p.data as Expense,
-        _pending: true,
+    const cached = await getAllFromStore<any>(STORES.EXPENSES);
+    // Mark pending entries from the store
+    return cached.map((e: any) => ({
+        ...e,
+        _pending: e._pending || e.synced === false,
     }));
-    return [...pendingData, ...cached];
 }
 
 export async function getCachedSavings(): Promise<Saving[]> {
-    const cached = await getAllFromStore<Saving>(STORES.SAVINGS);
-    const pending = (await getPendingSyncItems()).filter(i => i.type === 'saving');
-    const pendingData = pending.map(p => ({
-        ...p.data as Saving,
-        _pending: true,
+    const cached = await getAllFromStore<any>(STORES.SAVINGS);
+    // Mark pending entries from the store
+    return cached.map((e: any) => ({
+        ...e,
+        _pending: e._pending || e.synced === false,
     }));
-    return [...pendingData, ...cached];
+}
+
+// Clear pending entries from a store (called after successful sync)
+export async function clearPendingFromStore(type: 'expense' | 'saving'): Promise<void> {
+    const storeName = type === 'expense' ? STORES.EXPENSES : STORES.SAVINGS;
+    const all = await getAllFromStore<any>(storeName);
+    const pendingIds = all.filter((e: any) => e._pending || e.synced === false).map((e: any) => e.id).filter(Boolean);
+    for (const id of pendingIds) {
+        await deleteFromStore(storeName, id);
+    }
 }
 
 // Check if there's cached data
