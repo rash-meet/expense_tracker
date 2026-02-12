@@ -99,6 +99,28 @@ async function deleteFromStore(storeName: string, id: number): Promise<void> {
     });
 }
 
+async function getFromStore<T>(storeName: string, id: number): Promise<T | null> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const request = store.get(id);
+        request.onsuccess = () => resolve(request.result as T || null);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function updateInStore<T>(storeName: string, data: T): Promise<void> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        const request = store.put(data);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
 // Sync queue operations
 export async function addToSyncQueue(
     type: 'expense' | 'saving',
@@ -124,6 +146,63 @@ export async function clearSyncQueue(): Promise<void> {
 
 export async function removeSyncItem(id: number): Promise<void> {
     return deleteFromStore(STORES.SYNC_QUEUE, id);
+}
+
+// Update a sync queue item (for editing pending items)
+export async function updateSyncQueueItem(id: number, updatedData: Expense | Saving): Promise<void> {
+    const item = await getFromStore<SyncQueueItem>(STORES.SYNC_QUEUE, id);
+    if (item) {
+        item.data = updatedData;
+        item.timestamp = new Date().toISOString();
+        await updateInStore(STORES.SYNC_QUEUE, item);
+    }
+}
+
+// Delete a pending item from sync queue and its corresponding offline store entry
+export async function deletePendingItem(
+    syncId: number,
+    type: 'expense' | 'saving'
+): Promise<{ amount: number } | null> {
+    const item = await getFromStore<SyncQueueItem>(STORES.SYNC_QUEUE, syncId);
+    if (!item) return null;
+    const amount = (item.data as any).amount || 0;
+    await deleteFromStore(STORES.SYNC_QUEUE, syncId);
+
+    // Also remove from the offline expenses/savings store
+    const storeName = type === 'expense' ? STORES.EXPENSES : STORES.SAVINGS;
+    const allItems = await getAllFromStore<any>(storeName);
+    const offlineItem = allItems.find((i: any) => i._pending && i._offlineId && i.amount === amount);
+    if (offlineItem && offlineItem.id) {
+        await deleteFromStore(storeName, offlineItem.id);
+    }
+    return { amount };
+}
+
+// Update a pending offline entry in the local store
+export async function updatePendingOfflineEntry(
+    syncId: number,
+    type: 'expense' | 'saving',
+    updatedData: Expense | Saving
+): Promise<{ oldAmount: number; newAmount: number } | null> {
+    const item = await getFromStore<SyncQueueItem>(STORES.SYNC_QUEUE, syncId);
+    if (!item) return null;
+    const oldAmount = (item.data as any).amount || 0;
+    const newAmount = updatedData.amount || 0;
+
+    // Update sync queue
+    item.data = updatedData;
+    item.timestamp = new Date().toISOString();
+    await updateInStore(STORES.SYNC_QUEUE, item);
+
+    // Update in offline store
+    const storeName = type === 'expense' ? STORES.EXPENSES : STORES.SAVINGS;
+    const allItems = await getAllFromStore<any>(storeName);
+    const offlineItem = allItems.find((i: any) => i._pending && i._offlineId && i.amount === oldAmount);
+    if (offlineItem && offlineItem.id) {
+        const updated = { ...offlineItem, ...updatedData, _pending: true, synced: false };
+        await updateInStore(storeName, updated);
+    }
+    return { oldAmount, newAmount };
 }
 
 // Cache operations

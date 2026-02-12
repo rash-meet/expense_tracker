@@ -18,6 +18,7 @@ api = Blueprint('api', __name__, url_prefix='/api')
 # These will be set from app.py
 expenses_collection = None
 savings_collection = None
+settings_collection = None
 
 # Auth config - loaded from environment
 AUTH_USERNAME = None
@@ -26,12 +27,13 @@ JWT_SECRET = None
 TOTP_SECRET = None
 TOTP_ISSUER = "Finchest"
 
-def init_api(expenses, savings):
-    global expenses_collection, savings_collection
+def init_api(expenses, savings, settings=None):
+    global expenses_collection, savings_collection, settings_collection
     global AUTH_USERNAME, AUTH_PASSWORD, JWT_SECRET, TOTP_SECRET
     
     expenses_collection = expenses
     savings_collection = savings
+    settings_collection = settings
     
     # Load auth config
     AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
@@ -44,6 +46,17 @@ def init_api(expenses, savings):
         TOTP_SECRET = pyotp.random_base32()
         print(f"\n[TOTP] No TOTP_SECRET found! Generated new secret: {TOTP_SECRET}")
         print(f"[TOTP] Add this to your environment variables and restart.\n")
+    
+    # Seed default settings if collection is empty
+    if settings_collection is not None:
+        if settings_collection.count_documents({}) == 0:
+            settings_collection.insert_one({
+                'key': 'app_settings',
+                'categories': ['Travel', 'Food', 'Shopping', 'Mazze', 'Other'],
+                'payment_modes': ['UPI', 'Cash', 'Card'],
+                'saving_modes': ['Cash', 'Bank', 'Investment', 'Other']
+            })
+            print('[Settings] Seeded default settings.')
 
 
 # ==================== AUTHENTICATION ====================
@@ -558,6 +571,82 @@ def get_stats():
                 'saving_modes': saving_modes,
                 'current_month': today.strftime('%B %Y')
             }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== SETTINGS API ====================
+
+@api.route('/settings', methods=['GET'])
+@require_auth
+def get_settings():
+    """Get app settings (categories, payment_modes, saving_modes)"""
+    try:
+        if settings_collection is None:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'categories': ['Travel', 'Food', 'Shopping', 'Mazze', 'Other'],
+                    'payment_modes': ['UPI', 'Cash', 'Card'],
+                    'saving_modes': ['Cash', 'Bank', 'Investment', 'Other']
+                }
+            })
+        
+        settings = settings_collection.find_one({'key': 'app_settings'})
+        if not settings:
+            # Seed defaults
+            default = {
+                'key': 'app_settings',
+                'categories': ['Travel', 'Food', 'Shopping', 'Mazze', 'Other'],
+                'payment_modes': ['UPI', 'Cash', 'Card'],
+                'saving_modes': ['Cash', 'Bank', 'Investment', 'Other']
+            }
+            settings_collection.insert_one(default)
+            settings = default
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'categories': settings.get('categories', []),
+                'payment_modes': settings.get('payment_modes', []),
+                'saving_modes': settings.get('saving_modes', [])
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api.route('/settings', methods=['PUT'])
+@require_auth
+def update_settings():
+    """Update app settings (categories, payment_modes, saving_modes)"""
+    try:
+        if settings_collection is None:
+            return jsonify({'success': False, 'error': 'Settings not available'}), 500
+        
+        data = request.get_json()
+        update_fields = {}
+        
+        if 'categories' in data:
+            update_fields['categories'] = data['categories']
+        if 'payment_modes' in data:
+            update_fields['payment_modes'] = data['payment_modes']
+        if 'saving_modes' in data:
+            update_fields['saving_modes'] = data['saving_modes']
+        
+        if not update_fields:
+            return jsonify({'success': False, 'error': 'No fields to update'}), 400
+        
+        result = settings_collection.update_one(
+            {'key': 'app_settings'},
+            {'$set': update_fields},
+            upsert=True
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Settings updated successfully'
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

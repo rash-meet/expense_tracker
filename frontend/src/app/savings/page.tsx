@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
-import { getSavings, deleteSaving, checkHealth, getStats } from '@/lib/api';
-import { getCachedSavings, cacheSavings, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals } from '@/lib/offline';
+import { getSavings, deleteSaving, checkHealth, getStats, getSettings } from '@/lib/api';
+import { getCachedSavings, cacheSavings, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Saving } from '@/types';
 
@@ -39,15 +39,20 @@ export default function SavingReportPage() {
     const [toDate, setToDate] = useState('');
     const [savingModes, setSavingModes] = useState<string[]>([]);
 
+    // Editing pending item
+    const [editingPendingId, setEditingPendingId] = useState<string | null>(null);
+    const [editForm, setEditForm] = useState<{ amount: string; saving_mode: string; date: string; time: string; note: string }>({
+        amount: '', saving_mode: '', date: '', time: '', note: ''
+    });
+
     const currentYear = new Date().getFullYear();
     const yearsList = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
 
     useEffect(() => {
         if (!isAuthenticated) return;
 
-        // First, immediately show cached data
         const initializeData = async () => {
-            // First load cached monthly totals
+            // Load cached monthly totals
             const cachedTotals = await getCachedMonthlyTotals();
             if (cachedTotals) {
                 setTotalSaved(cachedTotals.monthSavings);
@@ -55,16 +60,20 @@ export default function SavingReportPage() {
                 setHasPending(cachedTotals.hasPending || false);
             }
 
+            // Try to load settings for dropdowns
+            try {
+                const settings = await getSettings();
+                if (settings?.saving_modes?.length) setSavingModes(settings.saving_modes);
+            } catch { /* use loaded data for dropdowns */ }
+
             const cached = await getCachedSavings();
             if (cached.length > 0) {
                 setSavings(cached);
                 setFilteredSavings(cached);
                 setTotalFiltered(cached.reduce((sum, s) => sum + s.amount, 0));
-                setLoading(false); // Show cached data immediately
-                // Fetch fresh data in background (don't await)
+                setLoading(false);
                 loadDataInBackground(1);
             } else {
-                // No cache, need to wait for API
                 loadData(1, true);
             }
         };
@@ -78,13 +87,27 @@ export default function SavingReportPage() {
             const response = await getSavings(pageNum, 50, filters);
 
             if (response.data && response.data.length > 0) {
-                setSavings(response.data);
-                setFilteredSavings(response.data);
-                setTotalFiltered(response.data.reduce((sum, s) => sum + s.amount, 0));
+                const cached = await getCachedSavings();
+                const pendingOnly = cached.filter(s => s._pending);
+                const combinedData = [...pendingOnly, ...response.data];
+
+                setSavings(combinedData);
+                setFilteredSavings(combinedData);
+                setTotalFiltered(combinedData.reduce((sum, s) => sum + s.amount, 0));
                 setHasMore(pageNum < response.pagination.pages);
                 setPage(pageNum);
                 cacheSavings(response.data);
                 setIsOnline(true);
+
+                const stats = await getStats();
+                if (stats) {
+                    setTotalSaved(stats.month_savings);
+                    setCurrentMonth(stats.current_month);
+                    setHasPending(pendingOnly.length > 0);
+                    await cacheMonthlyTotals(stats);
+                    const allModes = [...new Set([...savingModes, ...(stats.saving_modes || [])])];
+                    if (allModes.length > 0) setSavingModes(allModes);
+                }
             }
         } catch {
             setIsOnline(false);
@@ -102,13 +125,10 @@ export default function SavingReportPage() {
         setIsOnline(healthy);
 
         if (healthy) {
-            // Build filters
             const filters: any = {};
             if (fromDate) filters.from_date = fromDate;
             if (toDate) filters.to_date = toDate;
-
             if (modeFilter) filters.saving_mode = modeFilter;
-
             if (monthFilter) {
                 const monthNum = MONTHS.indexOf(monthFilter);
                 const year = yearFilter ? parseInt(yearFilter) : currentYear;
@@ -123,14 +143,14 @@ export default function SavingReportPage() {
             if (isReset) {
                 setSavings(response.data);
                 setFilteredSavings(response.data);
-
                 const stats = await getStats();
                 if (stats) {
                     setTotalSaved(stats.month_savings);
                     setCurrentMonth(stats.current_month);
                     setHasPending(false);
-                    // Cache the monthly totals for offline use
                     await cacheMonthlyTotals(stats);
+                    const allModes = [...new Set([...savingModes, ...(stats.saving_modes || [])])];
+                    if (allModes.length > 0) setSavingModes(allModes);
                 }
             } else {
                 setSavings(prev => {
@@ -139,7 +159,6 @@ export default function SavingReportPage() {
                     );
                     return [...prev, ...newItems];
                 });
-
                 setFilteredSavings(prev => {
                     const newItems = response.data.filter(newItem =>
                         !prev.some(existing => existing._id === newItem._id)
@@ -151,21 +170,14 @@ export default function SavingReportPage() {
             setHasMore(pageNum < response.pagination.pages);
             setPage(pageNum);
 
-            // Cache the data for offline use
             if (isReset) {
                 cacheSavings(response.data);
             }
 
             const allLoaded = isReset ? response.data : [...savings, ...response.data];
-            const modes = [...new Set(allLoaded.map(s => s.saving_mode))];
-            setSavingModes(modes);
-
             setTotalFiltered(allLoaded.reduce((sum, s) => sum + s.amount, 0));
-            if (!totalSaved && isReset) {
-                setTotalSaved(allLoaded.reduce((sum, s) => sum + s.amount, 0));
-            }
+
         } else {
-            // Offline
             const data = await getCachedSavings();
             setSavings(data);
             setFilteredSavings(data);
@@ -191,14 +203,9 @@ export default function SavingReportPage() {
         setModeFilter('');
         setFromDate('');
         setToDate('');
-
-        // Timeout to allow state updates to propagate or just force load with default dates in logic?
-        // Since loadData uses state, we have to wait a bit or pass params.
-        // For simplicity reusing the timeout trick.
         setTimeout(() => loadData(1, true), 50);
     };
 
-    // Client-side search (filters mostly done on backend now, but search is client side on loaded data)
     const displayedSavings = searchTerm
         ? filteredSavings.filter(s =>
             s.saving_mode.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -215,6 +222,83 @@ export default function SavingReportPage() {
             setSavings(updated);
             setFilteredSavings(filteredSavings.filter(s => s._id !== id));
         }
+    };
+
+    // Handle deleting a pending (unsynced) item
+    const handleDeletePending = async (saving: Saving) => {
+        if (!confirm('Delete this pending saving?')) return;
+        const pendingItems = await getPendingSyncItems();
+        const matchItem = pendingItems.find(p =>
+            p.type === 'saving' &&
+            (p.data as Saving).amount === saving.amount &&
+            (p.data as Saving).date === saving.date &&
+            (p.data as Saving).saving_mode === saving.saving_mode
+        );
+        if (matchItem && matchItem.id) {
+            const result = await deletePendingItem(matchItem.id, 'saving');
+            if (result) {
+                await updateLocalMonthlyTotals(-result.amount, 'saving');
+            }
+            const cached = await getCachedSavings();
+            setSavings(cached);
+            setFilteredSavings(cached);
+            setTotalFiltered(cached.reduce((sum, s) => sum + s.amount, 0));
+            const cachedTotals = await getCachedMonthlyTotals();
+            if (cachedTotals) {
+                setTotalSaved(cachedTotals.monthSavings);
+            }
+        }
+    };
+
+    const startEditPending = (saving: Saving) => {
+        const key = `${saving.amount}_${saving.date}_${saving.saving_mode}`;
+        setEditingPendingId(key);
+        setEditForm({
+            amount: saving.amount.toString(),
+            saving_mode: saving.saving_mode,
+            date: saving.date,
+            time: saving.time || '',
+            note: saving.note || '',
+        });
+    };
+
+    const saveEditPending = async (saving: Saving) => {
+        const pendingItems = await getPendingSyncItems();
+        const matchItem = pendingItems.find(p =>
+            p.type === 'saving' &&
+            (p.data as Saving).amount === saving.amount &&
+            (p.data as Saving).date === saving.date &&
+            (p.data as Saving).saving_mode === saving.saving_mode
+        );
+        if (matchItem && matchItem.id) {
+            const updatedSaving: Saving = {
+                amount: parseFloat(editForm.amount),
+                saving_mode: editForm.saving_mode,
+                date: editForm.date,
+                time: editForm.time,
+                note: editForm.note,
+            };
+            const result = await updatePendingOfflineEntry(matchItem.id, 'saving', updatedSaving);
+            if (result) {
+                const amountDiff = result.newAmount - result.oldAmount;
+                if (amountDiff !== 0) {
+                    await updateLocalMonthlyTotals(amountDiff, 'saving');
+                }
+            }
+            setEditingPendingId(null);
+            const cached = await getCachedSavings();
+            setSavings(cached);
+            setFilteredSavings(cached);
+            setTotalFiltered(cached.reduce((sum, s) => sum + s.amount, 0));
+            const cachedTotals = await getCachedMonthlyTotals();
+            if (cachedTotals) {
+                setTotalSaved(cachedTotals.monthSavings);
+            }
+        }
+    };
+
+    const cancelEditPending = () => {
+        setEditingPendingId(null);
     };
 
     return (
@@ -250,75 +334,39 @@ export default function SavingReportPage() {
                 <div className="row g-3">
                     <div className="col-md-2 col-6">
                         <label className="form-label">Month</label>
-                        <select
-                            className="form-select"
-                            value={monthFilter}
-                            onChange={(e) => setMonthFilter(e.target.value)}
-                        >
+                        <select className="form-select" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
                             <option value="">All Months</option>
-                            {MONTHS.map(m => (
-                                <option key={m} value={m}>{m}</option>
-                            ))}
+                            {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
                         </select>
                     </div>
                     {monthFilter && (
                         <div className="col-md-2 col-6">
                             <label className="form-label">Year</label>
-                            <select
-                                className="form-select"
-                                value={yearFilter}
-                                onChange={(e) => setYearFilter(e.target.value)}
-                            >
-                                {yearsList.map(y => (
-                                    <option key={y} value={y}>{y}</option>
-                                ))}
+                            <select className="form-select" value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                                {yearsList.map(y => <option key={y} value={y}>{y}</option>)}
                             </select>
                         </div>
                     )}
                     <div className="col-md-2 col-6">
                         <label className="form-label">From Date</label>
-                        <input
-                            type="date"
-                            className="form-control"
-                            value={fromDate}
-                            onChange={(e) => setFromDate(e.target.value)}
-                        />
+                        <input type="date" className="form-control" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
                     </div>
                     <div className="col-md-2 col-6">
                         <label className="form-label">To Date</label>
-                        <input
-                            type="date"
-                            className="form-control"
-                            value={toDate}
-                            onChange={(e) => setToDate(e.target.value)}
-                        />
+                        <input type="date" className="form-control" value={toDate} onChange={(e) => setToDate(e.target.value)} />
                     </div>
                     <div className="col-md-2 col-6">
                         <label className="form-label">Mode</label>
-                        <select
-                            className="form-select"
-                            value={modeFilter}
-                            onChange={(e) => setModeFilter(e.target.value)}
-                        >
+                        <select className="form-select" value={modeFilter} onChange={(e) => setModeFilter(e.target.value)}>
                             <option value="">All Modes</option>
-                            {savingModes.map(mode => (
-                                <option key={mode} value={mode}>{mode}</option>
-                            ))}
+                            {savingModes.map(mode => <option key={mode} value={mode}>{mode}</option>)}
                         </select>
                     </div>
                     <div className="col-12">
-                        <button
-                            type="button"
-                            className="btn btn-primary w-100 py-2 mt-2"
-                            onClick={applyFilters}
-                        >
+                        <button type="button" className="btn btn-primary w-100 py-2 mt-2" onClick={applyFilters}>
                             <i className="bi bi-funnel-fill me-2"></i>Apply Filters
                         </button>
-                        <button
-                            type="button"
-                            className="btn btn-secondary w-100 py-2 mt-2"
-                            onClick={resetFilters}
-                        >
+                        <button type="button" className="btn btn-secondary w-100 py-2 mt-2" onClick={resetFilters}>
                             <i className="bi bi-arrow-counterclockwise me-2"></i>Reset
                         </button>
                     </div>
@@ -376,35 +424,93 @@ export default function SavingReportPage() {
                                             <td colSpan={6} className="text-muted">No savings found.</td>
                                         </tr>
                                     ) : (
-                                        displayedSavings.map((s) => (
-                                            <tr key={s._id || s.id} className={s._pending ? 'pending-sync' : ''}>
-                                                <td>{s.date}</td>
-                                                <td>{s.time || '-'}</td>
-                                                <td>{s.saving_mode}</td>
-                                                <td>₹{s.amount.toFixed(2)}</td>
-                                                <td>{s.note || ''}</td>
-                                                <td className="text-center">
-                                                    {isOnline && s._id && !s._pending && (
-                                                        <>
-                                                            <Link
-                                                                href={`/savings/edit/${s._id}`}
-                                                                className="btn btn-sm btn-outline-warning mx-1"
-                                                                title="Edit"
-                                                            >
-                                                                <i className="bi bi-pencil"></i>
-                                                            </Link>
-                                                            <button
-                                                                className="btn btn-sm btn-outline-danger mx-1"
-                                                                title="Delete"
-                                                                onClick={() => handleDelete(s._id!)}
-                                                            >
-                                                                <i className="bi bi-trash"></i>
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))
+                                        displayedSavings.map((s, idx) => {
+                                            const editKey = `${s.amount}_${s.date}_${s.saving_mode}`;
+                                            const isEditing = editingPendingId === editKey && s._pending;
+                                            return isEditing ? (
+                                                <tr key={`edit_${idx}`} className="pending-sync">
+                                                    <td>
+                                                        <input type="date" className="form-control form-control-sm" value={editForm.date}
+                                                            onChange={(ev) => setEditForm({ ...editForm, date: ev.target.value })} />
+                                                    </td>
+                                                    <td>
+                                                        <input type="time" className="form-control form-control-sm" value={editForm.time}
+                                                            onChange={(ev) => setEditForm({ ...editForm, time: ev.target.value })} />
+                                                    </td>
+                                                    <td>
+                                                        <select className="form-select form-select-sm" value={editForm.saving_mode}
+                                                            onChange={(ev) => setEditForm({ ...editForm, saving_mode: ev.target.value })}>
+                                                            {savingModes.map(m => <option key={m} value={m}>{m}</option>)}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" step="0.01" className="form-control form-control-sm" value={editForm.amount}
+                                                            onChange={(ev) => setEditForm({ ...editForm, amount: ev.target.value })} />
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" className="form-control form-control-sm" value={editForm.note}
+                                                            onChange={(ev) => setEditForm({ ...editForm, note: ev.target.value })} />
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <button className="btn btn-sm btn-outline-success mx-1" title="Save"
+                                                            onClick={() => saveEditPending(s)}>
+                                                            <i className="bi bi-check-lg"></i>
+                                                        </button>
+                                                        <button className="btn btn-sm btn-outline-secondary mx-1" title="Cancel"
+                                                            onClick={cancelEditPending}>
+                                                            <i className="bi bi-x-lg"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                <tr key={s._id || `pending_${idx}`} className={s._pending ? 'pending-sync' : ''}>
+                                                    <td>{s.date}</td>
+                                                    <td>{s.time || '-'}</td>
+                                                    <td>{s.saving_mode}</td>
+                                                    <td>₹{s.amount.toFixed(2)}</td>
+                                                    <td>{s.note || ''}</td>
+                                                    <td className="text-center">
+                                                        {s._pending ? (
+                                                            <>
+                                                                <button
+                                                                    className="btn btn-sm btn-outline-warning mx-1"
+                                                                    title="Edit Pending"
+                                                                    onClick={() => startEditPending(s)}
+                                                                >
+                                                                    <i className="bi bi-pencil"></i>
+                                                                </button>
+                                                                <button
+                                                                    className="btn btn-sm btn-outline-danger mx-1"
+                                                                    title="Delete Pending"
+                                                                    onClick={() => handleDeletePending(s)}
+                                                                >
+                                                                    <i className="bi bi-trash"></i>
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            isOnline && s._id && (
+                                                                <>
+                                                                    <Link
+                                                                        href={`/savings/edit/${s._id}`}
+                                                                        className="btn btn-sm btn-outline-warning mx-1"
+                                                                        title="Edit"
+                                                                    >
+                                                                        <i className="bi bi-pencil"></i>
+                                                                    </Link>
+                                                                    <button
+                                                                        className="btn btn-sm btn-outline-danger mx-1"
+                                                                        title="Delete"
+                                                                        onClick={() => handleDelete(s._id!)}
+                                                                    >
+                                                                        <i className="bi bi-trash"></i>
+                                                                    </button>
+                                                                </>
+                                                            )
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>

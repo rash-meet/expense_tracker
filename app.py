@@ -54,10 +54,11 @@ client = MongoClient(app.config['MONGO_URI'])
 db = client.expense_tracker
 expenses = db.expenses
 savings = db.savings
+settings_col = db.settings
 
 # Register API blueprint for offline sync
 from api import api, init_api
-init_api(expenses, savings)
+init_api(expenses, savings, settings_col)
 app.register_blueprint(api)
 
 # Ensure static folder exists for charts

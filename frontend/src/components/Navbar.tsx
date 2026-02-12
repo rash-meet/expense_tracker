@@ -23,6 +23,7 @@ export default function Navbar() {
         { href: '/expenses', icon: 'bi-graph-up-arrow', label: 'Expense Report' },
         { href: '/savings', icon: 'bi-graph-down-arrow', label: 'Saving Report' },
         { href: '/manage-data', icon: 'bi-hdd-stack', label: 'Manage Data' },
+        { href: '/settings', icon: 'bi-gear', label: 'Settings' },
     ];
 
     return (

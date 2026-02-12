@@ -2,30 +2,51 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { addSaving, checkHealth } from '@/lib/api';
-import { addToSyncQueue, addOfflineSaving } from '@/lib/offline';
+import { addSaving, checkHealth, getSettings } from '@/lib/api';
+import { addToSyncQueue, addOfflineSaving, updateLocalMonthlyTotals } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 
-const SAVING_MODES = ['Cash', 'Bank', 'Investment', 'Other'];
+const DEFAULT_SAVING_MODES = ['Cash', 'Bank', 'Investment', 'Other'];
 
 export default function AddSavingPage() {
     const router = useRouter();
     const [isOnline, setIsOnline] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [savingModes, setSavingModes] = useState<string[]>(DEFAULT_SAVING_MODES);
 
     const [formData, setFormData] = useState({
         amount: '',
-        saving_mode: 'Cash',
+        saving_mode: '',
         date: new Date().toISOString().split('T')[0],
         note: '',
     });
 
     useEffect(() => {
-        const check = async () => {
+        const init = async () => {
             const healthy = await checkHealth();
             setIsOnline(healthy);
+            try {
+                const settings = await getSettings();
+                if (settings?.saving_modes?.length) {
+                    setSavingModes(settings.saving_modes);
+                    setFormData(prev => ({
+                        ...prev,
+                        saving_mode: prev.saving_mode || settings.saving_modes[0],
+                    }));
+                } else {
+                    setFormData(prev => ({
+                        ...prev,
+                        saving_mode: prev.saving_mode || DEFAULT_SAVING_MODES[0],
+                    }));
+                }
+            } catch {
+                setFormData(prev => ({
+                    ...prev,
+                    saving_mode: prev.saving_mode || DEFAULT_SAVING_MODES[0],
+                }));
+            }
         };
-        check();
+        init();
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -58,6 +79,7 @@ export default function AddSavingPage() {
             if (!isOnline || !submissionSuccess) {
                 await addToSyncQueue('saving', 'add', saving);
                 await addOfflineSaving(saving); // Store locally for immediate display
+                await updateLocalMonthlyTotals(saving.amount, 'saving');
                 submissionSuccess = true;
             }
 
@@ -98,7 +120,7 @@ export default function AddSavingPage() {
                                 onChange={(e) => setFormData({ ...formData, saving_mode: e.target.value })}
                                 required
                             >
-                                {SAVING_MODES.map((mode) => (
+                                {savingModes.map((mode) => (
                                     <option key={mode} value={mode}>{mode}</option>
                                 ))}
                             </select>

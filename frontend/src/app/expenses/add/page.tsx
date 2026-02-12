@@ -1,33 +1,59 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { addExpense, checkHealth } from '@/lib/api';
-import { addToSyncQueue, addOfflineExpense } from '@/lib/offline';
+import { addExpense, checkHealth, getSettings } from '@/lib/api';
+import { addToSyncQueue, addOfflineExpense, updateLocalMonthlyTotals } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 
-const CATEGORIES = ['Travel', 'Food', 'Shopping', 'Mazze', 'Other'];
-const PAYMENT_MODES = ['UPI', 'Cash', 'Card'];
+const DEFAULT_CATEGORIES = ['Travel', 'Food', 'Shopping', 'Mazze', 'Other'];
+const DEFAULT_PAYMENT_MODES = ['UPI', 'Cash', 'Card'];
 
 export default function AddExpensePage() {
     const [isOnline, setIsOnline] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+    const [paymentModes, setPaymentModes] = useState<string[]>(DEFAULT_PAYMENT_MODES);
 
     const [formData, setFormData] = useState({
         amount: '',
-        category: 'Travel',
-        payment_mode: 'UPI',
+        category: '',
+        payment_mode: '',
         date: new Date().toISOString().split('T')[0],
         time: '',
         note: '',
     });
 
     useEffect(() => {
-        const check = async () => {
+        const init = async () => {
             const healthy = await checkHealth();
             setIsOnline(healthy);
+            try {
+                const settings = await getSettings();
+                if (settings) {
+                    if (settings.categories?.length) setCategories(settings.categories);
+                    if (settings.payment_modes?.length) setPaymentModes(settings.payment_modes);
+                    setFormData(prev => ({
+                        ...prev,
+                        category: prev.category || (settings.categories?.[0] || DEFAULT_CATEGORIES[0]),
+                        payment_mode: prev.payment_mode || (settings.payment_modes?.[0] || DEFAULT_PAYMENT_MODES[0]),
+                    }));
+                } else {
+                    setFormData(prev => ({
+                        ...prev,
+                        category: prev.category || DEFAULT_CATEGORIES[0],
+                        payment_mode: prev.payment_mode || DEFAULT_PAYMENT_MODES[0],
+                    }));
+                }
+            } catch {
+                setFormData(prev => ({
+                    ...prev,
+                    category: prev.category || DEFAULT_CATEGORIES[0],
+                    payment_mode: prev.payment_mode || DEFAULT_PAYMENT_MODES[0],
+                }));
+            }
         };
-        check();
+        init();
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -62,6 +88,7 @@ export default function AddExpensePage() {
             if (!isOnline || !submissionSuccess) {
                 await addToSyncQueue('expense', 'add', expense);
                 await addOfflineExpense(expense); // Store locally for immediate display
+                await updateLocalMonthlyTotals(expense.amount, 'expense');
                 submissionSuccess = true;
             }
 
@@ -118,7 +145,7 @@ export default function AddExpensePage() {
                                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                                 required
                             >
-                                {CATEGORIES.map((cat) => (
+                                {categories.map((cat) => (
                                     <option key={cat} value={cat}>{cat}</option>
                                 ))}
                             </select>
@@ -132,7 +159,7 @@ export default function AddExpensePage() {
                                 onChange={(e) => setFormData({ ...formData, payment_mode: e.target.value })}
                                 required
                             >
-                                {PAYMENT_MODES.map((mode) => (
+                                {paymentModes.map((mode) => (
                                     <option key={mode} value={mode}>{mode}</option>
                                 ))}
                             </select>

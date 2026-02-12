@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
-import { getExpenses, deleteExpense, checkHealth, getStats } from '@/lib/api';
-import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals } from '@/lib/offline';
+import { getExpenses, deleteExpense, checkHealth, getStats, getSettings } from '@/lib/api';
+import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
-import { Expense } from '@/types';
+import { Expense, SyncQueueItem } from '@/types';
 
 // Dynamic import for Chart.js to avoid SSR issues
 const PieChart = dynamic(() => import('@/components/PieChart'), { ssr: false });
@@ -31,9 +31,6 @@ export default function ExpenseReportPage() {
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
 
-    // Initial fetch done ref to prevent double fetch on mount
-    const initialFetchDone = useState(false);
-
     // Filters
     const [monthFilter, setMonthFilter] = useState('');
     const [yearFilter, setYearFilter] = useState('');
@@ -44,15 +41,23 @@ export default function ExpenseReportPage() {
     const [categories, setCategories] = useState<string[]>([]);
     const [paymentModes, setPaymentModes] = useState<string[]>([]);
 
+    // Pending items mapping (syncQueueId -> SyncQueueItem)
+    const [pendingSyncMap, setPendingSyncMap] = useState<Map<string, number>>(new Map());
+
+    // Editing pending item
+    const [editingPendingId, setEditingPendingId] = useState<string | null>(null);
+    const [editForm, setEditForm] = useState<{ amount: string; category: string; payment_mode: string; date: string; time: string; note: string }>({
+        amount: '', category: '', payment_mode: '', date: '', time: '', note: ''
+    });
+
     const currentYear = new Date().getFullYear();
     const yearsList = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
 
     useEffect(() => {
         if (!isAuthenticated) return;
 
-        // First, immediately show cached data
         const initializeData = async () => {
-            // First load cached monthly totals
+            // Load cached monthly totals
             const cachedTotals = await getCachedMonthlyTotals();
             if (cachedTotals) {
                 setCurrentMonth(cachedTotals.currentMonth);
@@ -60,21 +65,42 @@ export default function ExpenseReportPage() {
                 setHasPending(cachedTotals.hasPending || false);
             }
 
+            // Load pending sync map
+            await refreshPendingMap();
+
+            // Try to load settings for dropdowns
+            try {
+                const settings = await getSettings();
+                if (settings) {
+                    if (settings.categories?.length) setCategories(settings.categories);
+                    if (settings.payment_modes?.length) setPaymentModes(settings.payment_modes);
+                }
+            } catch { /* use loaded data for dropdowns */ }
+
             const cached = await getCachedExpenses();
             if (cached.length > 0) {
                 setExpenses(cached);
                 setFilteredExpenses(cached);
                 setTotalFiltered(cached.reduce((sum, e) => sum + e.amount, 0));
-                setLoading(false); // Show cached data immediately
-                // Fetch fresh data in background (don't await)
+                setLoading(false);
                 loadDataInBackground(1);
             } else {
-                // No cache, need to wait for API
                 loadData(1, true);
             }
         };
         initializeData();
     }, [isAuthenticated]);
+
+    const refreshPendingMap = async () => {
+        const pendingItems = await getPendingSyncItems();
+        const map = new Map<string, number>();
+        pendingItems.filter(i => i.type === 'expense').forEach((item, idx) => {
+            // Use a composite key for pending items
+            const key = `pending_${item.id || idx}`;
+            map.set(key, item.id!);
+        });
+        setPendingSyncMap(map);
+    };
 
     // Background loading - doesn't show spinner
     const loadDataInBackground = async (pageNum: number) => {
@@ -83,9 +109,14 @@ export default function ExpenseReportPage() {
             const response = await getExpenses(pageNum, 50, filters);
 
             if (response.data && response.data.length > 0) {
-                setExpenses(response.data);
-                setFilteredExpenses(response.data);
-                setTotalFiltered(response.data.reduce((sum, e) => sum + e.amount, 0));
+                // Add pending items from cache
+                const cached = await getCachedExpenses();
+                const pendingOnly = cached.filter(e => e._pending);
+                const combinedData = [...pendingOnly, ...response.data];
+
+                setExpenses(combinedData);
+                setFilteredExpenses(combinedData);
+                setTotalFiltered(combinedData.reduce((sum, e) => sum + e.amount, 0));
                 setHasMore(pageNum < response.pagination.pages);
                 setPage(pageNum);
                 cacheExpenses(response.data);
@@ -95,9 +126,13 @@ export default function ExpenseReportPage() {
                 if (stats) {
                     setCurrentMonth(stats.current_month);
                     setCurrentMonthTotal(stats.month_expenses);
-                    setHasPending(false);
-                    // Cache the monthly totals for offline use
+                    setHasPending(pendingOnly.length > 0);
                     await cacheMonthlyTotals(stats);
+                    // Merge settings categories with data categories
+                    const allCats = [...new Set([...categories, ...(stats.categories || [])])];
+                    const allModes = [...new Set([...paymentModes, ...(stats.payment_modes || [])])];
+                    if (allCats.length > 0) setCategories(allCats);
+                    if (allModes.length > 0) setPaymentModes(allModes);
                 }
             }
         } catch {
@@ -116,21 +151,14 @@ export default function ExpenseReportPage() {
         setIsOnline(healthy);
 
         if (healthy) {
-            // Build filters
             const filters: any = {};
             if (fromDate) filters.from_date = fromDate;
             if (toDate) filters.to_date = toDate;
-            // Only apply other filters if they are set (handled by applyFilters usually, 
-            // but here we need current state if we are loading more)
-            // Actually, state values are current.
             if (categoryFilter) filters.category = categoryFilter;
             if (paymentFilter) filters.payment_mode = paymentFilter;
-            // Month filter overrides date range if set, but we are defaulting to date range.
-            // If user selected specific month, we should use that.
             if (monthFilter) {
                 const monthNum = MONTHS.indexOf(monthFilter);
                 const year = yearFilter ? parseInt(yearFilter) : currentYear;
-                // Calculate start and end of that month
                 const start = new Date(year, monthNum, 1);
                 const end = new Date(year, monthNum + 1, 0);
                 filters.from_date = start.toISOString().split('T')[0];
@@ -142,15 +170,18 @@ export default function ExpenseReportPage() {
             if (isReset) {
                 setExpenses(response.data);
                 setFilteredExpenses(response.data);
-                // Stats for total
                 const stats = await getStats();
                 if (stats) {
                     setCurrentMonth(stats.current_month);
                     setCurrentMonthTotal(stats.month_expenses);
+                    // Merge categories from stats
+                    const allCats = [...new Set([...categories, ...(stats.categories || [])])];
+                    const allModes = [...new Set([...paymentModes, ...(stats.payment_modes || [])])];
+                    if (allCats.length > 0) setCategories(allCats);
+                    if (allModes.length > 0) setPaymentModes(allModes);
                 }
             } else {
                 setExpenses(prev => {
-                    // Filter out any items that already exist in the state to prevent duplicates
                     const newItems = response.data.filter(newItem =>
                         !prev.some(existing => existing._id === newItem._id)
                     );
@@ -168,24 +199,14 @@ export default function ExpenseReportPage() {
             setHasMore(pageNum < response.pagination.pages);
             setPage(pageNum);
 
-            // Cache the data for offline use
             if (isReset) {
                 cacheExpenses(response.data);
             }
 
-            // Update categories/modes from ALL loaded data (or just current batch? Better all)
-            // But we only have loaded data.
             const allLoaded = isReset ? response.data : [...expenses, ...response.data];
-            const cats = [...new Set(allLoaded.map(e => e.category))];
-            const modes = [...new Set(allLoaded.map(e => e.payment_mode))];
-            setCategories(cats);
-            setPaymentModes(modes);
-
-            // Recalculate totals
             setTotalFiltered(allLoaded.reduce((sum, e) => sum + e.amount, 0));
 
         } else {
-            // Offline - load everything cached
             const data = await getCachedExpenses();
             setExpenses(data);
             setFilteredExpenses(data);
@@ -211,27 +232,8 @@ export default function ExpenseReportPage() {
         setYearFilter('');
         setCategoryFilter('');
         setPaymentFilter('');
-
         setFromDate('');
         setToDate('');
-
-        // We need to wait for state update? No, loadData uses state.
-        // State updates are async. We should pass filters explicitly or wait.
-        // Better to pass filters to loadData, but I implemented loadData to read state.
-        // Fix: Update state then trigger effect? Or pass overrides.
-        // I will just trigger a reload with timeouts/effects or better: separate fetch logic.
-        // For now, I'll forcefully call loadData with empty params manually inside reset 
-        // effectively by passing "reset" flag and handling it?
-        // Actually, just calling loadData(1, true) immediately reads OLD state.
-        // Quick fix: Set state and then rely on user to click "Apply"? 
-        // No, reset usually auto-applies.
-        // I will use a timeout or useEffect dependency, or just pass overrides to loadData.
-        // Let's modify loadData to accept optional filters Override.
-
-        // Actually, simplest is to just reload the page or cleaner: 
-        // creating a "filters" object state instead of individual states would solve this.
-        // For now, I will manually clear filters in the API call within reset.
-
         setTimeout(() => loadData(1, true), 50);
     };
 
@@ -252,6 +254,90 @@ export default function ExpenseReportPage() {
             setExpenses(updated);
             setFilteredExpenses(filteredExpenses.filter(e => e._id !== id));
         }
+    };
+
+    // Handle deleting a pending (unsynced) item
+    const handleDeletePending = async (expense: Expense) => {
+        if (!confirm('Delete this pending expense?')) return;
+        const pendingItems = await getPendingSyncItems();
+        const matchItem = pendingItems.find(p =>
+            p.type === 'expense' &&
+            (p.data as Expense).amount === expense.amount &&
+            (p.data as Expense).date === expense.date &&
+            (p.data as Expense).category === expense.category
+        );
+        if (matchItem && matchItem.id) {
+            const result = await deletePendingItem(matchItem.id, 'expense');
+            if (result) {
+                await updateLocalMonthlyTotals(-result.amount, 'expense');
+            }
+            // Refresh data
+            const cached = await getCachedExpenses();
+            setExpenses(cached);
+            setFilteredExpenses(cached);
+            setTotalFiltered(cached.reduce((sum, e) => sum + e.amount, 0));
+            const cachedTotals = await getCachedMonthlyTotals();
+            if (cachedTotals) {
+                setCurrentMonthTotal(cachedTotals.monthExpenses);
+            }
+            await refreshPendingMap();
+        }
+    };
+
+    // Start editing a pending item
+    const startEditPending = (expense: Expense) => {
+        const key = `${expense.amount}_${expense.date}_${expense.category}`;
+        setEditingPendingId(key);
+        setEditForm({
+            amount: expense.amount.toString(),
+            category: expense.category,
+            payment_mode: expense.payment_mode,
+            date: expense.date,
+            time: expense.time || '',
+            note: expense.note || '',
+        });
+    };
+
+    // Save edited pending item
+    const saveEditPending = async (expense: Expense) => {
+        const pendingItems = await getPendingSyncItems();
+        const matchItem = pendingItems.find(p =>
+            p.type === 'expense' &&
+            (p.data as Expense).amount === expense.amount &&
+            (p.data as Expense).date === expense.date &&
+            (p.data as Expense).category === expense.category
+        );
+        if (matchItem && matchItem.id) {
+            const updatedExpense: Expense = {
+                amount: parseFloat(editForm.amount),
+                category: editForm.category,
+                payment_mode: editForm.payment_mode,
+                date: editForm.date,
+                time: editForm.time,
+                note: editForm.note,
+            };
+            const result = await updatePendingOfflineEntry(matchItem.id, 'expense', updatedExpense);
+            if (result) {
+                const amountDiff = result.newAmount - result.oldAmount;
+                if (amountDiff !== 0) {
+                    await updateLocalMonthlyTotals(amountDiff, 'expense');
+                }
+            }
+            setEditingPendingId(null);
+            // Refresh data
+            const cached = await getCachedExpenses();
+            setExpenses(cached);
+            setFilteredExpenses(cached);
+            setTotalFiltered(cached.reduce((sum, e) => sum + e.amount, 0));
+            const cachedTotals = await getCachedMonthlyTotals();
+            if (cachedTotals) {
+                setCurrentMonthTotal(cachedTotals.monthExpenses);
+            }
+        }
+    };
+
+    const cancelEditPending = () => {
+        setEditingPendingId(null);
     };
 
     return (
@@ -427,36 +513,100 @@ export default function ExpenseReportPage() {
                                             <td colSpan={7} className="text-muted">No expenses found.</td>
                                         </tr>
                                     ) : (
-                                        displayedExpenses.map((e) => (
-                                            <tr key={e._id || e.id} className={e._pending ? 'pending-sync' : ''}>
-                                                <td>{e.date}</td>
-                                                <td>{e.time || '-'}</td>
-                                                <td>{e.category}</td>
-                                                <td>{e.payment_mode}</td>
-                                                <td>₹{e.amount.toFixed(2)}</td>
-                                                <td>{e.note || ''}</td>
-                                                <td className="text-center">
-                                                    {isOnline && e._id && !e._pending && (
-                                                        <>
-                                                            <Link
-                                                                href={`/expenses/edit/${e._id}`}
-                                                                className="btn btn-sm btn-outline-warning mx-1"
-                                                                title="Edit"
-                                                            >
-                                                                <i className="bi bi-pencil"></i>
-                                                            </Link>
-                                                            <button
-                                                                className="btn btn-sm btn-outline-danger mx-1"
-                                                                title="Delete"
-                                                                onClick={() => handleDelete(e._id!)}
-                                                            >
-                                                                <i className="bi bi-trash"></i>
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))
+                                        displayedExpenses.map((e, idx) => {
+                                            const editKey = `${e.amount}_${e.date}_${e.category}`;
+                                            const isEditing = editingPendingId === editKey && e._pending;
+                                            return isEditing ? (
+                                                <tr key={`edit_${idx}`} className="pending-sync">
+                                                    <td>
+                                                        <input type="date" className="form-control form-control-sm" value={editForm.date}
+                                                            onChange={(ev) => setEditForm({ ...editForm, date: ev.target.value })} />
+                                                    </td>
+                                                    <td>
+                                                        <input type="time" className="form-control form-control-sm" value={editForm.time}
+                                                            onChange={(ev) => setEditForm({ ...editForm, time: ev.target.value })} />
+                                                    </td>
+                                                    <td>
+                                                        <select className="form-select form-select-sm" value={editForm.category}
+                                                            onChange={(ev) => setEditForm({ ...editForm, category: ev.target.value })}>
+                                                            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select className="form-select form-select-sm" value={editForm.payment_mode}
+                                                            onChange={(ev) => setEditForm({ ...editForm, payment_mode: ev.target.value })}>
+                                                            {paymentModes.map(m => <option key={m} value={m}>{m}</option>)}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" step="0.01" className="form-control form-control-sm" value={editForm.amount}
+                                                            onChange={(ev) => setEditForm({ ...editForm, amount: ev.target.value })} />
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" className="form-control form-control-sm" value={editForm.note}
+                                                            onChange={(ev) => setEditForm({ ...editForm, note: ev.target.value })} />
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <button className="btn btn-sm btn-outline-success mx-1" title="Save"
+                                                            onClick={() => saveEditPending(e)}>
+                                                            <i className="bi bi-check-lg"></i>
+                                                        </button>
+                                                        <button className="btn btn-sm btn-outline-secondary mx-1" title="Cancel"
+                                                            onClick={cancelEditPending}>
+                                                            <i className="bi bi-x-lg"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                <tr key={e._id || `pending_${idx}`} className={e._pending ? 'pending-sync' : ''}>
+                                                    <td>{e.date}</td>
+                                                    <td>{e.time || '-'}</td>
+                                                    <td>{e.category}</td>
+                                                    <td>{e.payment_mode}</td>
+                                                    <td>₹{e.amount.toFixed(2)}</td>
+                                                    <td>{e.note || ''}</td>
+                                                    <td className="text-center">
+                                                        {e._pending ? (
+                                                            <>
+                                                                <button
+                                                                    className="btn btn-sm btn-outline-warning mx-1"
+                                                                    title="Edit Pending"
+                                                                    onClick={() => startEditPending(e)}
+                                                                >
+                                                                    <i className="bi bi-pencil"></i>
+                                                                </button>
+                                                                <button
+                                                                    className="btn btn-sm btn-outline-danger mx-1"
+                                                                    title="Delete Pending"
+                                                                    onClick={() => handleDeletePending(e)}
+                                                                >
+                                                                    <i className="bi bi-trash"></i>
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            isOnline && e._id && (
+                                                                <>
+                                                                    <Link
+                                                                        href={`/expenses/edit/${e._id}`}
+                                                                        className="btn btn-sm btn-outline-warning mx-1"
+                                                                        title="Edit"
+                                                                    >
+                                                                        <i className="bi bi-pencil"></i>
+                                                                    </Link>
+                                                                    <button
+                                                                        className="btn btn-sm btn-outline-danger mx-1"
+                                                                        title="Delete"
+                                                                        onClick={() => handleDelete(e._id!)}
+                                                                    >
+                                                                        <i className="bi bi-trash"></i>
+                                                                    </button>
+                                                                </>
+                                                            )
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>

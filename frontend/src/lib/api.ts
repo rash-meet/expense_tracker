@@ -250,3 +250,25 @@ export async function syncBulk(expenses: Expense[], savings: Saving[]): Promise<
         body: JSON.stringify({ expenses, savings }),
     });
 }
+
+// Settings API
+export interface Settings {
+    categories: string[];
+    payment_modes: string[];
+    saving_modes: string[];
+}
+
+export async function getSettings(): Promise<Settings | null> {
+    const response = await apiRequest<Settings>('/api/settings');
+    if (response.success && response.data) {
+        return response.data;
+    }
+    return null;
+}
+
+export async function updateSettings(settings: Partial<Settings>): Promise<ApiResponse<void>> {
+    return apiRequest('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+    });
+}
