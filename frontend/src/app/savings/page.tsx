@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getSavings, deleteSaving, checkHealth, getStats, getSettings } from '@/lib/api';
-import { getCachedSavings, cacheSavings, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals } from '@/lib/offline';
+import { getCachedSavings, cacheSavings, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedSavingByServerId } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Saving } from '@/types';
 
@@ -235,9 +235,7 @@ export default function SavingReportPage() {
 
             // Update offline cache
             await updateLocalMonthlyTotals(-deletedItem.amount, 'saving');
-
-            // Background re-sync
-            cacheSavings(updated);
+            await removeCachedSavingByServerId(id);
         }
     };
 

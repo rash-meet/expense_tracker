@@ -131,6 +131,48 @@ async function deleteFromStore(storeName: string, id: number): Promise<void> {
     }
 }
 
+async function deleteFromStoreByServerId(storeName: string, serverId: string): Promise<void> {
+    const db = await openDB();
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+
+            let _idIndex: IDBIndex | null = null;
+            try {
+                _idIndex = store.index('_id');
+            } catch {
+                _idIndex = null;
+            }
+
+            if (_idIndex) {
+                const req = _idIndex.getKey(serverId);
+                req.onsuccess = () => {
+                    const key = req.result;
+                    if (key !== undefined) {
+                        store.delete(key as IDBValidKey);
+                    }
+                };
+            } else {
+                const req = store.getAll();
+                req.onsuccess = () => {
+                    const items = req.result as any[];
+                    const match = items.find((i) => i._id === serverId);
+                    if (match && match.id) {
+                        store.delete(match.id);
+                    }
+                };
+            }
+
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error);
+        });
+    } finally {
+        db.close();
+    }
+}
+
 async function getFromStore<T>(storeName: string, id: number): Promise<T | null> {
     const db = await openDB();
     try {
@@ -241,6 +283,14 @@ export async function updatePendingOfflineEntry(
         await updateInStore(storeName, updated);
     }
     return { oldAmount, newAmount };
+}
+
+export async function removeCachedExpenseByServerId(id: string): Promise<void> {
+    await deleteFromStoreByServerId(STORES.EXPENSES, id);
+}
+
+export async function removeCachedSavingByServerId(id: string): Promise<void> {
+    await deleteFromStoreByServerId(STORES.SAVINGS, id);
 }
 
 // Check if an item is pending sync

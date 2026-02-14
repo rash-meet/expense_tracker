@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getExpenses, deleteExpense, checkHealth, getStats, getSettings } from '@/lib/api';
-import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals } from '@/lib/offline';
+import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedExpenseByServerId } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import OfflineValidation from '@/components/OfflineValidation'; // Added Debugger
 import { Expense, SyncQueueItem } from '@/types';
@@ -277,19 +277,7 @@ export default function ExpenseReportPage() {
 
             // Update offline cache for reliability
             await updateLocalMonthlyTotals(-deletedItem.amount, 'expense');
-            // Re-cache expenses to ensure consistency
-            const newCache = await getCachedExpenses();
-            // Filter out the deleted one if it's still there (it shouldn't be if synced, but if offline logic was used...)
-            // Wait, deleteExpense is online. We should also remove it from cache manually if needed.
-            // Actually, let's just re-fetch cache or update it manually.
-            const updatedCache = newCache.filter(e => e._id !== id);
-            // We can't easily "put" the whole array back without potentially overwriting other things if we are not careful.
-            // But we can delete from store by ID if we knew the local ID.
-            // Ideally, cacheExpenses([updated list]) handles it but that's an upsert.
-            // For now, updating the state variables covers the "real time" requirement.
-
-            // Background re-sync to be safe
-            cacheExpenses(updated);
+            await removeCachedExpenseByServerId(id);
         }
     };
 
