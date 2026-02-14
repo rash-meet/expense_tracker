@@ -256,50 +256,48 @@ async function isPending(id: string, type: 'expense' | 'saving'): Promise<boolea
 export async function cacheExpenses(expenses: Expense[]): Promise<void> {
     const db = await openDB();
     try {
-        const tx = db.transaction(STORES.EXPENSES, 'readwrite');
-        const store = tx.objectStore(STORES.EXPENSES);
-
-        let _idIndex: IDBIndex | null = null;
-        try {
-            _idIndex = store.index('_id');
-        } catch {
-            console.warn('[Offline] _id index missing for EXPENSES, falling back to manual scan/add.');
-        }
-
         for (const expense of expenses) {
             if (!expense._id) continue;
 
-            const saveItem = () => {
-                store.add({ ...expense, synced: true });
-            };
+            await new Promise<void>((resolve, reject) => {
+                const tx = db.transaction(STORES.EXPENSES, 'readwrite');
+                const store = tx.objectStore(STORES.EXPENSES);
 
-            const updateItem = (item: any) => {
-                if (item._pending || item.synced === false) return; // Don't overwrite pending local changes
-                const updated = { ...expense, id: item.id, synced: true };
-                store.put(updated);
-            };
-
-            if (_idIndex) {
+                let _idIndex: IDBIndex | null = null;
                 try {
+                    _idIndex = store.index('_id');
+                } catch {
+                    console.warn('[Offline] _id index missing for EXPENSES, falling back to manual scan/add.');
+                }
+
+                const saveItem = () => {
+                    store.add({ ...expense, synced: true });
+                };
+
+                const updateItem = (item: any) => {
+                    if (item._pending || item.synced === false) return; // Don't overwrite pending local changes
+                    const updated = { ...expense, id: item.id, synced: true };
+                    store.put(updated);
+                };
+
+                if (_idIndex) {
                     const req = _idIndex.get(expense._id);
-                    await new Promise<void>((resolve) => {
-                        req.onsuccess = () => {
-                            if (req.result) updateItem(req.result);
-                            else saveItem();
-                            resolve();
-                        };
-                        req.onerror = () => { saveItem(); resolve(); }; // If index get fails, just add
-                    });
-                } catch (e) {
-                    console.error('[Offline] Error using _id index for EXPENSES, adding item:', e);
+                    req.onsuccess = () => {
+                        if (req.result) updateItem(req.result);
+                        else saveItem();
+                    };
+                    req.onerror = () => { saveItem(); };
+                } else {
+                    // Fallback: if index is missing, we can't efficiently check for existing items by _id.
+                    // To prevent data loss, we'll just add the item. This might create duplicates if the item
+                    // already exists but was not found due to missing index.
                     saveItem();
                 }
-            } else {
-                // Fallback: if index is missing, we can't efficiently check for existing items by _id.
-                // To prevent data loss, we'll just add the item. This might create duplicates if the item
-                // already exists but was not found due to missing index.
-                saveItem();
-            }
+
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+                tx.onabort = () => reject(tx.error);
+            });
         }
     } finally {
         db.close();
@@ -309,50 +307,48 @@ export async function cacheExpenses(expenses: Expense[]): Promise<void> {
 export async function cacheSavings(savings: Saving[]): Promise<void> {
     const db = await openDB();
     try {
-        const tx = db.transaction(STORES.SAVINGS, 'readwrite');
-        const store = tx.objectStore(STORES.SAVINGS);
-
-        let _idIndex: IDBIndex | null = null;
-        try {
-            _idIndex = store.index('_id');
-        } catch {
-            console.warn('[Offline] _id index missing for SAVINGS, falling back to manual scan/add.');
-        }
-
         for (const saving of savings) {
             if (!saving._id) continue;
 
-            const saveItem = () => {
-                store.add({ ...saving, synced: true });
-            };
+            await new Promise<void>((resolve, reject) => {
+                const tx = db.transaction(STORES.SAVINGS, 'readwrite');
+                const store = tx.objectStore(STORES.SAVINGS);
 
-            const updateItem = (item: any) => {
-                if (item._pending || item.synced === false) return; // Don't overwrite pending local changes
-                const updated = { ...saving, id: item.id, synced: true };
-                store.put(updated);
-            };
-
-            if (_idIndex) {
+                let _idIndex: IDBIndex | null = null;
                 try {
+                    _idIndex = store.index('_id');
+                } catch {
+                    console.warn('[Offline] _id index missing for SAVINGS, falling back to manual scan/add.');
+                }
+
+                const saveItem = () => {
+                    store.add({ ...saving, synced: true });
+                };
+
+                const updateItem = (item: any) => {
+                    if (item._pending || item.synced === false) return; // Don't overwrite pending local changes
+                    const updated = { ...saving, id: item.id, synced: true };
+                    store.put(updated);
+                };
+
+                if (_idIndex) {
                     const req = _idIndex.get(saving._id);
-                    await new Promise<void>((resolve) => {
-                        req.onsuccess = () => {
-                            if (req.result) updateItem(req.result);
-                            else saveItem();
-                            resolve();
-                        };
-                        req.onerror = () => { saveItem(); resolve(); }; // If index get fails, just add
-                    });
-                } catch (e) {
-                    console.error('[Offline] Error using _id index for SAVINGS, adding item:', e);
+                    req.onsuccess = () => {
+                        if (req.result) updateItem(req.result);
+                        else saveItem();
+                    };
+                    req.onerror = () => { saveItem(); };
+                } else {
+                    // Fallback: if index is missing, we can't efficiently check for existing items by _id.
+                    // To prevent data loss, we'll just add the item. This might create duplicates if the item
+                    // already exists but was not found due to missing index.
                     saveItem();
                 }
-            } else {
-                // Fallback: if index is missing, we can't efficiently check for existing items by _id.
-                // To prevent data loss, we'll just add the item. This might create duplicates if the item
-                // already exists but was not found due to missing index.
-                saveItem();
-            }
+
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+                tx.onabort = () => reject(tx.error);
+            });
         }
     } finally {
         db.close();

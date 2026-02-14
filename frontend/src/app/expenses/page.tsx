@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { getExpenses, deleteExpense, checkHealth, getStats, getSettings } from '@/lib/api';
 import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
+import OfflineValidation from '@/components/OfflineValidation'; // Added Debugger
 import { Expense, SyncQueueItem } from '@/types';
 
 // Dynamic import for Chart.js to avoid SSR issues
@@ -387,6 +388,9 @@ export default function ExpenseReportPage() {
                     <span className="badge bg-warning text-dark ms-2">+ Pending</span>
                 )}
             </div>
+
+            {/* Debug Tool - Temporary for troubleshooting */}
+            <OfflineValidation />
 
             {/* Search Box */}
             <div className="mb-4">
