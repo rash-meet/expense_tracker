@@ -3,7 +3,7 @@
 import { Expense, Saving, SyncQueueItem } from '@/types';
 
 const DB_NAME = 'finchest-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 const STORES = {
     EXPENSES: 'expenses',
@@ -70,71 +70,95 @@ function openDB(): Promise<IDBDatabase> {
     });
 }
 
-// Generic store operations
+// Generic store operations with auto-close
 async function addToStore<T>(storeName: string, data: T): Promise<number> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        const request = store.add(data);
-        request.onsuccess = () => resolve(request.result as number);
-        request.onerror = () => reject(request.error);
-    });
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const request = store.add(data);
+            request.onsuccess = () => resolve(request.result as number);
+            request.onerror = () => reject(request.error);
+        });
+    } finally {
+        db.close();
+    }
 }
 
 async function getAllFromStore<T>(storeName: string): Promise<T[]> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readonly');
-        const store = tx.objectStore(storeName);
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result as T[]);
-        request.onerror = () => reject(request.error);
-    });
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result as T[]);
+            request.onerror = () => reject(request.error);
+        });
+    } finally {
+        db.close();
+    }
 }
 
 async function clearStore(storeName: string): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        const request = store.clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const request = store.clear();
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    } finally {
+        db.close();
+    }
 }
 
 async function deleteFromStore(storeName: string, id: number): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        const request = store.delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const request = store.delete(id);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    } finally {
+        db.close();
+    }
 }
 
 async function getFromStore<T>(storeName: string, id: number): Promise<T | null> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readonly');
-        const store = tx.objectStore(storeName);
-        const request = store.get(id);
-        request.onsuccess = () => resolve(request.result as T || null);
-        request.onerror = () => reject(request.error);
-    });
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const request = store.get(id);
+            request.onsuccess = () => resolve(request.result as T || null);
+            request.onerror = () => reject(request.error);
+        });
+    } finally {
+        db.close();
+    }
 }
 
 async function updateInStore<T>(storeName: string, data: T): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        const request = store.put(data);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const request = store.put(data);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    } finally {
+        db.close();
+    }
 }
 
 // Sync queue operations
@@ -156,9 +180,7 @@ export async function getPendingSyncItems(): Promise<SyncQueueItem[]> {
     return getAllFromStore<SyncQueueItem>(STORES.SYNC_QUEUE);
 }
 
-export async function clearSyncQueue(): Promise<void> {
-    return clearStore(STORES.SYNC_QUEUE);
-}
+// No changes needed for SyncService as offline.ts handles DB lifecycle now.
 
 export async function removeSyncItem(id: number): Promise<void> {
     return deleteFromStore(STORES.SYNC_QUEUE, id);
@@ -230,90 +252,110 @@ async function isPending(id: string, type: 'expense' | 'saving'): Promise<boolea
     );
 }
 
-// Cache operations
+// Cache operations with robust upsert
 export async function cacheExpenses(expenses: Expense[]): Promise<void> {
-    // Instead of clearing, we upsert items
-    // If an item exists locally and is pending sync, we do NOT overwrite it
-    // If an item exists and is synced, we update it
-    // If an item doesn't exist, we add it
-
     const db = await openDB();
-    const tx = db.transaction(STORES.EXPENSES, 'readwrite');
-    const store = tx.objectStore(STORES.EXPENSES);
-    const _idIndex = store.index('_id');
+    try {
+        const tx = db.transaction(STORES.EXPENSES, 'readwrite');
+        const store = tx.objectStore(STORES.EXPENSES);
 
-    for (const expense of expenses) {
-        if (!expense._id) continue;
-
+        let _idIndex: IDBIndex | null = null;
         try {
-            // Check if item exists by _id
-            const existingRequest = _idIndex.get(expense._id);
-
-            await new Promise<void>((resolve) => {
-                existingRequest.onsuccess = () => {
-                    const existing = existingRequest.result;
-
-                    if (existing) {
-                        // Item exists
-                        if (existing._pending || existing.synced === false) {
-                            // It's pending sync (locally modified), do NOT overwrite
-                            resolve();
-                        } else {
-                            // It's synced, safe to update
-                            // Keep the local ID
-                            const updated = { ...expense, id: existing.id, synced: true };
-                            store.put(updated);
-                            resolve();
-                        }
-                    } else {
-                        // Item doesn't exist, add it
-                        store.add({ ...expense, synced: true });
-                        resolve();
-                    }
-                };
-                existingRequest.onerror = () => resolve(); // Skip on error
-            });
-        } catch (e) {
-            console.error('Error caching expense:', e);
+            _idIndex = store.index('_id');
+        } catch {
+            console.warn('[Offline] _id index missing for EXPENSES, falling back to manual scan/add.');
         }
+
+        for (const expense of expenses) {
+            if (!expense._id) continue;
+
+            const saveItem = () => {
+                store.add({ ...expense, synced: true });
+            };
+
+            const updateItem = (item: any) => {
+                if (item._pending || item.synced === false) return; // Don't overwrite pending local changes
+                const updated = { ...expense, id: item.id, synced: true };
+                store.put(updated);
+            };
+
+            if (_idIndex) {
+                try {
+                    const req = _idIndex.get(expense._id);
+                    await new Promise<void>((resolve) => {
+                        req.onsuccess = () => {
+                            if (req.result) updateItem(req.result);
+                            else saveItem();
+                            resolve();
+                        };
+                        req.onerror = () => { saveItem(); resolve(); }; // If index get fails, just add
+                    });
+                } catch (e) {
+                    console.error('[Offline] Error using _id index for EXPENSES, adding item:', e);
+                    saveItem();
+                }
+            } else {
+                // Fallback: if index is missing, we can't efficiently check for existing items by _id.
+                // To prevent data loss, we'll just add the item. This might create duplicates if the item
+                // already exists but was not found due to missing index.
+                saveItem();
+            }
+        }
+    } finally {
+        db.close();
     }
 }
 
 export async function cacheSavings(savings: Saving[]): Promise<void> {
-    // Same logic for savings
     const db = await openDB();
-    const tx = db.transaction(STORES.SAVINGS, 'readwrite');
-    const store = tx.objectStore(STORES.SAVINGS);
-    const _idIndex = store.index('_id');
+    try {
+        const tx = db.transaction(STORES.SAVINGS, 'readwrite');
+        const store = tx.objectStore(STORES.SAVINGS);
 
-    for (const saving of savings) {
-        if (!saving._id) continue;
-
+        let _idIndex: IDBIndex | null = null;
         try {
-            const existingRequest = _idIndex.get(saving._id);
-
-            await new Promise<void>((resolve) => {
-                existingRequest.onsuccess = () => {
-                    const existing = existingRequest.result;
-
-                    if (existing) {
-                        if (existing._pending || existing.synced === false) {
-                            resolve();
-                        } else {
-                            const updated = { ...saving, id: existing.id, synced: true };
-                            store.put(updated);
-                            resolve();
-                        }
-                    } else {
-                        store.add({ ...saving, synced: true });
-                        resolve();
-                    }
-                };
-                existingRequest.onerror = () => resolve();
-            });
-        } catch (e) {
-            console.error('Error caching saving:', e);
+            _idIndex = store.index('_id');
+        } catch {
+            console.warn('[Offline] _id index missing for SAVINGS, falling back to manual scan/add.');
         }
+
+        for (const saving of savings) {
+            if (!saving._id) continue;
+
+            const saveItem = () => {
+                store.add({ ...saving, synced: true });
+            };
+
+            const updateItem = (item: any) => {
+                if (item._pending || item.synced === false) return; // Don't overwrite pending local changes
+                const updated = { ...saving, id: item.id, synced: true };
+                store.put(updated);
+            };
+
+            if (_idIndex) {
+                try {
+                    const req = _idIndex.get(saving._id);
+                    await new Promise<void>((resolve) => {
+                        req.onsuccess = () => {
+                            if (req.result) updateItem(req.result);
+                            else saveItem();
+                            resolve();
+                        };
+                        req.onerror = () => { saveItem(); resolve(); }; // If index get fails, just add
+                    });
+                } catch (e) {
+                    console.error('[Offline] Error using _id index for SAVINGS, adding item:', e);
+                    saveItem();
+                }
+            } else {
+                // Fallback: if index is missing, we can't efficiently check for existing items by _id.
+                // To prevent data loss, we'll just add the item. This might create duplicates if the item
+                // already exists but was not found due to missing index.
+                saveItem();
+            }
+        }
+    } finally {
+        db.close();
     }
 }
 

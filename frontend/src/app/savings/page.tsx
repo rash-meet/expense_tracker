@@ -89,11 +89,13 @@ export default function SavingReportPage() {
             if (response.data && response.data.length > 0) {
                 const cached = await getCachedSavings();
                 const pendingOnly = cached.filter(s => s._pending);
-                const combinedData = [...pendingOnly, ...response.data];
 
-                setSavings(combinedData);
-                setFilteredSavings(combinedData);
-                setTotalFiltered(combinedData.reduce((sum, s) => sum + s.amount, 0));
+                await cacheSavings(response.data);
+                const updatedCache = await getCachedSavings();
+
+                setSavings(updatedCache);
+                setFilteredSavings(updatedCache);
+                setTotalFiltered(updatedCache.reduce((sum, s) => sum + s.amount, 0));
                 setHasMore(pageNum < response.pagination.pages);
                 setPage(pageNum);
                 cacheSavings(response.data);

@@ -112,11 +112,20 @@ export default function ExpenseReportPage() {
                 // Add pending items from cache
                 const cached = await getCachedExpenses();
                 const pendingOnly = cached.filter(e => e._pending);
-                const combinedData = [...pendingOnly, ...response.data];
 
-                setExpenses(combinedData);
-                setFilteredExpenses(combinedData);
-                setTotalFiltered(combinedData.reduce((sum, e) => sum + e.amount, 0));
+                // Merge strategies:
+                // 1. Start with existing cached data (already in state? maybe)
+                // 2. Or re-read cache completely (safest if cacheExpenses executed successfully)
+
+                // Since we just called cacheExpenses(response.data), the indexedDB now has the merged data.
+                // So we should re-read the FULL cache to update the UI consistently.
+
+                await cacheExpenses(response.data); // Update cache first
+                const updatedCache = await getCachedExpenses(); // Read back full source of truth
+
+                setExpenses(updatedCache);
+                setFilteredExpenses(updatedCache);
+                setTotalFiltered(updatedCache.reduce((sum, e) => sum + e.amount, 0));
                 setHasMore(pageNum < response.pagination.pages);
                 setPage(pageNum);
                 cacheExpenses(response.data);
