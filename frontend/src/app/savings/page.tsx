@@ -218,11 +218,26 @@ export default function SavingReportPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this saving?')) return;
+
+        const deletedItem = savings.find(s => s._id === id);
+        if (!deletedItem) return;
+
         const result = await deleteSaving(id);
+
         if (result.success) {
             const updated = savings.filter(s => s._id !== id);
             setSavings(updated);
             setFilteredSavings(filteredSavings.filter(s => s._id !== id));
+
+            // Update totals
+            setTotalFiltered(prev => prev - deletedItem.amount);
+            setTotalSaved(prev => prev - deletedItem.amount);
+
+            // Update offline cache
+            await updateLocalMonthlyTotals(-deletedItem.amount, 'saving');
+
+            // Background re-sync
+            cacheSavings(updated);
         }
     };
 

@@ -362,19 +362,47 @@ export async function cacheSavings(savings: Saving[]): Promise<void> {
 export async function getCachedExpenses(): Promise<Expense[]> {
     const cached = await getAllFromStore<any>(STORES.EXPENSES);
     // Mark pending entries from the store
-    return cached.map((e: any) => ({
+    const mapped = cached.map((e: any) => ({
         ...e,
         _pending: e._pending || e.synced === false,
     }));
+
+    // Sort by date desc, then time desc, then id desc
+    return mapped.sort((a: any, b: any) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        if (dateA !== dateB) return dateB - dateA;
+
+        if (a.time && b.time) {
+            const timeCompare = b.time.localeCompare(a.time);
+            if (timeCompare !== 0) return timeCompare;
+        }
+
+        return (b.id || 0) - (a.id || 0);
+    });
 }
 
 export async function getCachedSavings(): Promise<Saving[]> {
     const cached = await getAllFromStore<any>(STORES.SAVINGS);
     // Mark pending entries from the store
-    return cached.map((e: any) => ({
+    const mapped = cached.map((e: any) => ({
         ...e,
         _pending: e._pending || e.synced === false,
     }));
+
+    // Sort by date desc, then time desc, then id desc
+    return mapped.sort((a: any, b: any) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        if (dateA !== dateB) return dateB - dateA;
+
+        if (a.time && b.time) {
+            const timeCompare = b.time.localeCompare(a.time);
+            if (timeCompare !== 0) return timeCompare;
+        }
+
+        return (b.id || 0) - (a.id || 0);
+    });
 }
 
 // Clear pending entries from a store (called after successful sync)
