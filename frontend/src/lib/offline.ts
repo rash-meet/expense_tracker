@@ -293,6 +293,70 @@ export async function removeCachedSavingByServerId(id: string): Promise<void> {
     await deleteFromStoreByServerId(STORES.SAVINGS, id);
 }
 
+export async function rebuildExpensesCacheFromServer(expenses: Expense[]): Promise<void> {
+    const db = await openDB();
+    try {
+        const pending = (await getAllFromStore<any>(STORES.EXPENSES))
+            .filter((e: any) => e._pending || e.synced === false);
+        const pendingIds = new Set<string>(pending.map((e: any) => e._id).filter(Boolean));
+
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction(STORES.EXPENSES, 'readwrite');
+            const store = tx.objectStore(STORES.EXPENSES);
+
+            store.clear();
+
+            for (const item of pending) {
+                store.add(item);
+            }
+
+            for (const expense of expenses) {
+                if (!expense._id) continue;
+                if (pendingIds.has(expense._id)) continue; // Keep pending local edits
+                store.add({ ...expense, synced: true });
+            }
+
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error);
+        });
+    } finally {
+        db.close();
+    }
+}
+
+export async function rebuildSavingsCacheFromServer(savings: Saving[]): Promise<void> {
+    const db = await openDB();
+    try {
+        const pending = (await getAllFromStore<any>(STORES.SAVINGS))
+            .filter((s: any) => s._pending || s.synced === false);
+        const pendingIds = new Set<string>(pending.map((s: any) => s._id).filter(Boolean));
+
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction(STORES.SAVINGS, 'readwrite');
+            const store = tx.objectStore(STORES.SAVINGS);
+
+            store.clear();
+
+            for (const item of pending) {
+                store.add(item);
+            }
+
+            for (const saving of savings) {
+                if (!saving._id) continue;
+                if (pendingIds.has(saving._id)) continue; // Keep pending local edits
+                store.add({ ...saving, synced: true });
+            }
+
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error);
+        });
+    } finally {
+        db.close();
+    }
+}
+
 // Check if an item is pending sync
 async function isPending(id: string, type: 'expense' | 'saving'): Promise<boolean> {
     const pending = await getPendingSyncItems();

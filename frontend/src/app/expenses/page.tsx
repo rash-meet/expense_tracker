@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getExpenses, deleteExpense, checkHealth, getStats, getSettings } from '@/lib/api';
-import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedExpenseByServerId } from '@/lib/offline';
+import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedExpenseByServerId, rebuildExpensesCacheFromServer } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import OfflineValidation from '@/components/OfflineValidation'; // Added Debugger
 import { Expense, SyncQueueItem } from '@/types';
@@ -26,6 +26,7 @@ export default function ExpenseReportPage() {
     const [currentMonth, setCurrentMonth] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [hasPending, setHasPending] = useState(false);
+    const fullSyncDoneRef = useRef(false);
 
     // Pagination State
     const [page, setPage] = useState(1);
@@ -103,6 +104,35 @@ export default function ExpenseReportPage() {
         setPendingSyncMap(map);
     };
 
+    const syncFullCacheFromServer = async () => {
+        if (fullSyncDoneRef.current) return;
+        fullSyncDoneRef.current = true;
+
+        try {
+            const all: Expense[] = [];
+            let pageNum = 1;
+            const limit = 200;
+
+            while (true) {
+                const response = await getExpenses(pageNum, limit, {});
+                if (response.data?.length) {
+                    all.push(...response.data);
+                }
+                if (pageNum >= response.pagination.pages) break;
+                pageNum += 1;
+            }
+
+            await rebuildExpensesCacheFromServer(all);
+            const updatedCache = await getCachedExpenses();
+            setExpenses(updatedCache);
+            setFilteredExpenses(updatedCache);
+            setTotalFiltered(updatedCache.reduce((sum, e) => sum + e.amount, 0));
+        } catch {
+            // Ignore errors; background sync will retry next load
+            fullSyncDoneRef.current = false;
+        }
+    };
+
     // Background loading - doesn't show spinner
     const loadDataInBackground = async (pageNum: number) => {
         try {
@@ -143,6 +173,10 @@ export default function ExpenseReportPage() {
                     const allModes = [...new Set([...paymentModes, ...(stats.payment_modes || [])])];
                     if (allCats.length > 0) setCategories(allCats);
                     if (allModes.length > 0) setPaymentModes(allModes);
+                }
+
+                if (pageNum === 1) {
+                    syncFullCacheFromServer();
                 }
             }
         } catch {

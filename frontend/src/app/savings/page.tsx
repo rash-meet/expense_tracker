@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getSavings, deleteSaving, checkHealth, getStats, getSettings } from '@/lib/api';
-import { getCachedSavings, cacheSavings, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedSavingByServerId } from '@/lib/offline';
+import { getCachedSavings, cacheSavings, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedSavingByServerId, rebuildSavingsCacheFromServer } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Saving } from '@/types';
 
@@ -25,6 +25,7 @@ export default function SavingReportPage() {
     const [totalFiltered, setTotalFiltered] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
     const [hasPending, setHasPending] = useState(false);
+    const fullSyncDoneRef = useRef(false);
 
     // Pagination State
     const [page, setPage] = useState(1);
@@ -80,6 +81,35 @@ export default function SavingReportPage() {
         initializeData();
     }, [isAuthenticated]);
 
+    const syncFullCacheFromServer = async () => {
+        if (fullSyncDoneRef.current) return;
+        fullSyncDoneRef.current = true;
+
+        try {
+            const all: Saving[] = [];
+            let pageNum = 1;
+            const limit = 200;
+
+            while (true) {
+                const response = await getSavings(pageNum, limit, {});
+                if (response.data?.length) {
+                    all.push(...response.data);
+                }
+                if (pageNum >= response.pagination.pages) break;
+                pageNum += 1;
+            }
+
+            await rebuildSavingsCacheFromServer(all);
+            const updatedCache = await getCachedSavings();
+            setSavings(updatedCache);
+            setFilteredSavings(updatedCache);
+            setTotalFiltered(updatedCache.reduce((sum, s) => sum + s.amount, 0));
+        } catch {
+            // Ignore errors; background sync will retry next load
+            fullSyncDoneRef.current = false;
+        }
+    };
+
     // Background loading - doesn't show spinner
     const loadDataInBackground = async (pageNum: number) => {
         try {
@@ -109,6 +139,10 @@ export default function SavingReportPage() {
                     await cacheMonthlyTotals(stats);
                     const allModes = [...new Set([...savingModes, ...(stats.saving_modes || [])])];
                     if (allModes.length > 0) setSavingModes(allModes);
+                }
+
+                if (pageNum === 1) {
+                    syncFullCacheFromServer();
                 }
             }
         } catch {
