@@ -3,7 +3,7 @@
 import { Expense, Saving, SyncQueueItem } from '@/types';
 
 const DB_NAME = 'finchest-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const STORES = {
     EXPENSES: 'expenses',
@@ -28,12 +28,28 @@ function openDB(): Promise<IDBDatabase> {
                 const expenseStore = db.createObjectStore(STORES.EXPENSES, { keyPath: 'id', autoIncrement: true });
                 expenseStore.createIndex('date', 'date');
                 expenseStore.createIndex('synced', 'synced');
+                expenseStore.createIndex('_id', '_id', { unique: true }); // Index for server ID
+            } else {
+                // Upgrade existing store to add _id index if missing
+                const tx = (event.target as IDBOpenDBRequest).transaction!;
+                const store = tx.objectStore(STORES.EXPENSES);
+                if (!store.indexNames.contains('_id')) {
+                    store.createIndex('_id', '_id', { unique: true });
+                }
             }
 
             if (!db.objectStoreNames.contains(STORES.SAVINGS)) {
                 const savingStore = db.createObjectStore(STORES.SAVINGS, { keyPath: 'id', autoIncrement: true });
                 savingStore.createIndex('date', 'date');
                 savingStore.createIndex('synced', 'synced');
+                savingStore.createIndex('_id', '_id', { unique: true }); // Index for server ID
+            } else {
+                // Upgrade existing store to add _id index if missing
+                const tx = (event.target as IDBOpenDBRequest).transaction!;
+                const store = tx.objectStore(STORES.SAVINGS);
+                if (!store.indexNames.contains('_id')) {
+                    store.createIndex('_id', '_id', { unique: true });
+                }
             }
 
             if (!db.objectStoreNames.contains(STORES.SYNC_QUEUE)) {
@@ -205,40 +221,99 @@ export async function updatePendingOfflineEntry(
     return { oldAmount, newAmount };
 }
 
+// Check if an item is pending sync
+async function isPending(id: string, type: 'expense' | 'saving'): Promise<boolean> {
+    const pending = await getPendingSyncItems();
+    return pending.some(item =>
+        item.type === type && (item.action === 'update' || item.action === 'delete') &&
+        (item.data as any)._id === id
+    );
+}
+
 // Cache operations
 export async function cacheExpenses(expenses: Expense[]): Promise<void> {
-    // Check if there are pending sync items - only preserve pending entries if queue has items
-    const pendingSync = (await getPendingSyncItems()).filter(i => i.type === 'expense');
-    const existing = await getAllFromStore<any>(STORES.EXPENSES);
-    const pendingEntries = pendingSync.length > 0
-        ? existing.filter((e: any) => e._pending || e.synced === false)
-        : []; // No pending sync items = clear all pending entries (they were synced)
-    await clearStore(STORES.EXPENSES);
-    // Re-add pending entries first (only if sync queue still has items)
-    for (const entry of pendingEntries) {
-        await addToStore(STORES.EXPENSES, entry);
-    }
-    // Then add synced entries
+    // Instead of clearing, we upsert items
+    // If an item exists locally and is pending sync, we do NOT overwrite it
+    // If an item exists and is synced, we update it
+    // If an item doesn't exist, we add it
+
+    const db = await openDB();
+    const tx = db.transaction(STORES.EXPENSES, 'readwrite');
+    const store = tx.objectStore(STORES.EXPENSES);
+    const _idIndex = store.index('_id');
+
     for (const expense of expenses) {
-        await addToStore(STORES.EXPENSES, { ...expense, synced: true });
+        if (!expense._id) continue;
+
+        try {
+            // Check if item exists by _id
+            const existingRequest = _idIndex.get(expense._id);
+
+            await new Promise<void>((resolve) => {
+                existingRequest.onsuccess = () => {
+                    const existing = existingRequest.result;
+
+                    if (existing) {
+                        // Item exists
+                        if (existing._pending || existing.synced === false) {
+                            // It's pending sync (locally modified), do NOT overwrite
+                            resolve();
+                        } else {
+                            // It's synced, safe to update
+                            // Keep the local ID
+                            const updated = { ...expense, id: existing.id, synced: true };
+                            store.put(updated);
+                            resolve();
+                        }
+                    } else {
+                        // Item doesn't exist, add it
+                        store.add({ ...expense, synced: true });
+                        resolve();
+                    }
+                };
+                existingRequest.onerror = () => resolve(); // Skip on error
+            });
+        } catch (e) {
+            console.error('Error caching expense:', e);
+        }
     }
 }
 
 export async function cacheSavings(savings: Saving[]): Promise<void> {
-    // Check if there are pending sync items - only preserve pending entries if queue has items
-    const pendingSync = (await getPendingSyncItems()).filter(i => i.type === 'saving');
-    const existing = await getAllFromStore<any>(STORES.SAVINGS);
-    const pendingEntries = pendingSync.length > 0
-        ? existing.filter((e: any) => e._pending || e.synced === false)
-        : []; // No pending sync items = clear all pending entries (they were synced)
-    await clearStore(STORES.SAVINGS);
-    // Re-add pending entries first (only if sync queue still has items)
-    for (const entry of pendingEntries) {
-        await addToStore(STORES.SAVINGS, entry);
-    }
-    // Then add synced entries
+    // Same logic for savings
+    const db = await openDB();
+    const tx = db.transaction(STORES.SAVINGS, 'readwrite');
+    const store = tx.objectStore(STORES.SAVINGS);
+    const _idIndex = store.index('_id');
+
     for (const saving of savings) {
-        await addToStore(STORES.SAVINGS, { ...saving, synced: true });
+        if (!saving._id) continue;
+
+        try {
+            const existingRequest = _idIndex.get(saving._id);
+
+            await new Promise<void>((resolve) => {
+                existingRequest.onsuccess = () => {
+                    const existing = existingRequest.result;
+
+                    if (existing) {
+                        if (existing._pending || existing.synced === false) {
+                            resolve();
+                        } else {
+                            const updated = { ...saving, id: existing.id, synced: true };
+                            store.put(updated);
+                            resolve();
+                        }
+                    } else {
+                        store.add({ ...saving, synced: true });
+                        resolve();
+                    }
+                };
+                existingRequest.onerror = () => resolve();
+            });
+        } catch (e) {
+            console.error('Error caching saving:', e);
+        }
     }
 }
 
