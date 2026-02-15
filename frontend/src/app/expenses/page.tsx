@@ -94,6 +94,7 @@ export default function ExpenseReportPage() {
                 }
             } catch {
                 await loadCachedData();
+            } finally {
                 setLoading(false);
             }
         };

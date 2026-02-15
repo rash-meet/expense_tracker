@@ -83,6 +83,7 @@ export default function SavingReportPage() {
                 }
             } catch {
                 await loadCachedData();
+            } finally {
                 setLoading(false);
             }
         };

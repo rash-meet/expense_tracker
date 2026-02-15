@@ -17,9 +17,24 @@ const STORES = {
 function openDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
+        const timeoutId = setTimeout(() => {
+            reject(new Error('IndexedDB open timeout'));
+        }, 5000);
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => {
+            clearTimeout(timeoutId);
+            reject(request.error);
+        };
+        request.onblocked = () => {
+            clearTimeout(timeoutId);
+            reject(new Error('IndexedDB open blocked by another tab/session'));
+        };
+        request.onsuccess = () => {
+            clearTimeout(timeoutId);
+            const db = request.result;
+            db.onversionchange = () => db.close();
+            resolve(db);
+        };
 
         request.onupgradeneeded = (event) => {
             const db = (event.target as IDBOpenDBRequest).result;
