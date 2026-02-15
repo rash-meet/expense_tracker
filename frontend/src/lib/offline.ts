@@ -371,7 +371,8 @@ export async function cacheExpenses(expenses: Expense[]): Promise<void> {
     const db = await openDB();
     try {
         for (const expense of expenses) {
-            if (!expense._id) continue;
+            const serverId = expense._id;
+            if (!serverId) continue;
 
             await new Promise<void>((resolve, reject) => {
                 const tx = db.transaction(STORES.EXPENSES, 'readwrite');
@@ -395,7 +396,7 @@ export async function cacheExpenses(expenses: Expense[]): Promise<void> {
                 };
 
                 if (_idIndex) {
-                    const req = _idIndex.get(expense._id);
+                    const req = _idIndex.get(serverId);
                     req.onsuccess = () => {
                         if (req.result) updateItem(req.result);
                         else saveItem();
@@ -422,7 +423,8 @@ export async function cacheSavings(savings: Saving[]): Promise<void> {
     const db = await openDB();
     try {
         for (const saving of savings) {
-            if (!saving._id) continue;
+            const serverId = saving._id;
+            if (!serverId) continue;
 
             await new Promise<void>((resolve, reject) => {
                 const tx = db.transaction(STORES.SAVINGS, 'readwrite');
@@ -446,7 +448,7 @@ export async function cacheSavings(savings: Saving[]): Promise<void> {
                 };
 
                 if (_idIndex) {
-                    const req = _idIndex.get(saving._id);
+                    const req = _idIndex.get(serverId);
                     req.onsuccess = () => {
                         if (req.result) updateItem(req.result);
                         else saveItem();
