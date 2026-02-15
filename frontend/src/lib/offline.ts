@@ -3,7 +3,7 @@
 import { Expense, Saving, SyncQueueItem } from '@/types';
 
 const DB_NAME = 'finchest-db';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 const STORES = {
     EXPENSES: 'expenses',
@@ -28,13 +28,14 @@ function openDB(): Promise<IDBDatabase> {
                 const expenseStore = db.createObjectStore(STORES.EXPENSES, { keyPath: 'id', autoIncrement: true });
                 expenseStore.createIndex('date', 'date');
                 expenseStore.createIndex('synced', 'synced');
-                expenseStore.createIndex('_id', '_id', { unique: true }); // Index for server ID
+                // Keep non-unique to avoid migration failures on legacy duplicate rows.
+                expenseStore.createIndex('_id', '_id', { unique: false });
             } else {
                 // Upgrade existing store to add _id index if missing
                 const tx = (event.target as IDBOpenDBRequest).transaction!;
                 const store = tx.objectStore(STORES.EXPENSES);
                 if (!store.indexNames.contains('_id')) {
-                    store.createIndex('_id', '_id', { unique: true });
+                    store.createIndex('_id', '_id', { unique: false });
                 }
             }
 
@@ -42,13 +43,14 @@ function openDB(): Promise<IDBDatabase> {
                 const savingStore = db.createObjectStore(STORES.SAVINGS, { keyPath: 'id', autoIncrement: true });
                 savingStore.createIndex('date', 'date');
                 savingStore.createIndex('synced', 'synced');
-                savingStore.createIndex('_id', '_id', { unique: true }); // Index for server ID
+                // Keep non-unique to avoid migration failures on legacy duplicate rows.
+                savingStore.createIndex('_id', '_id', { unique: false });
             } else {
                 // Upgrade existing store to add _id index if missing
                 const tx = (event.target as IDBOpenDBRequest).transaction!;
                 const store = tx.objectStore(STORES.SAVINGS);
                 if (!store.indexNames.contains('_id')) {
-                    store.createIndex('_id', '_id', { unique: true });
+                    store.createIndex('_id', '_id', { unique: false });
                 }
             }
 
