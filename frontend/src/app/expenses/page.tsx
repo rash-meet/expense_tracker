@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getExpenses, deleteExpense, checkHealth, getStats, getSettings } from '@/lib/api';
-import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedExpenseByServerId, rebuildExpensesCacheFromServer } from '@/lib/offline';
+import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedExpenseByServerId, rebuildExpensesCacheFromServer, cleanupInvalidCachedRows } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Expense, SyncQueueItem } from '@/types';
 
@@ -69,6 +69,7 @@ export default function ExpenseReportPage() {
 
                 // Load pending sync map
                 await refreshPendingMap();
+                await cleanupInvalidCachedRows();
 
                 // Try to load settings for dropdowns
                 try {

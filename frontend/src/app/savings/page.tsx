@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getSavings, deleteSaving, checkHealth, getStats, getSettings } from '@/lib/api';
-import { getCachedSavings, cacheSavings, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedSavingByServerId, rebuildSavingsCacheFromServer } from '@/lib/offline';
+import { getCachedSavings, cacheSavings, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedSavingByServerId, rebuildSavingsCacheFromServer, cleanupInvalidCachedRows } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Saving } from '@/types';
 
@@ -67,6 +67,7 @@ export default function SavingReportPage() {
                     const settings = await getSettings();
                     if (settings?.saving_modes?.length) setSavingModes(settings.saving_modes);
                 } catch { /* use loaded data for dropdowns */ }
+                await cleanupInvalidCachedRows();
 
                 const cached = await getCachedSavings();
                 if (cached.length > 0) {

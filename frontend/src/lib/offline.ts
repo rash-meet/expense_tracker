@@ -287,6 +287,67 @@ export async function updatePendingOfflineEntry(
     return { oldAmount, newAmount };
 }
 
+function sameExpenseShape(a: any, b: any): boolean {
+    return (
+        a.amount === b.amount &&
+        a.date === b.date &&
+        a.category === b.category &&
+        a.payment_mode === b.payment_mode &&
+        (a.time || '') === (b.time || '') &&
+        (a.note || '') === (b.note || '')
+    );
+}
+
+function sameSavingShape(a: any, b: any): boolean {
+    return (
+        a.amount === b.amount &&
+        a.date === b.date &&
+        a.saving_mode === b.saving_mode &&
+        (a.time || '') === (b.time || '') &&
+        (a.note || '') === (b.note || '')
+    );
+}
+
+export async function cleanupInvalidCachedRows(): Promise<void> {
+    const pendingItems = await getPendingSyncItems();
+    const expenseQueueAdds = pendingItems
+        .filter((item) => item.type === 'expense' && item.action === 'add')
+        .map((item) => item.data as Expense);
+    const savingQueueAdds = pendingItems
+        .filter((item) => item.type === 'saving' && item.action === 'add')
+        .map((item) => item.data as Saving);
+
+    const expenses = await getAllFromStore<any>(STORES.EXPENSES);
+    const badExpenseIds = expenses
+        .filter((e: any) => {
+            const isPending = e._pending || e.synced === false;
+            if (!isPending && !e._id) return true; // Corrupt synced row without server id
+            if (isPending && !expenseQueueAdds.some((q) => sameExpenseShape(q, e))) return true; // Orphan pending row
+            return false;
+        })
+        .map((e: any) => e.id)
+        .filter(Boolean);
+
+    for (const id of badExpenseIds) {
+        await deleteFromStore(STORES.EXPENSES, id);
+    }
+
+    const savings = await getAllFromStore<any>(STORES.SAVINGS);
+    const badSavingIds = savings
+        .filter((s: any) => {
+            const isPending = s._pending || s.synced === false;
+            if (!isPending && !s._id) return true; // Corrupt synced row without server id
+            if (isPending && !savingQueueAdds.some((q) => sameSavingShape(q, s))) return true; // Orphan pending row
+            return false;
+        })
+        .map((s: any) => s.id)
+        .filter(Boolean);
+
+    for (const id of badSavingIds) {
+        await deleteFromStore(STORES.SAVINGS, id);
+    }
+}
+
 export async function removeCachedExpenseByServerId(id: string): Promise<void> {
     await deleteFromStoreByServerId(STORES.EXPENSES, id);
 }
@@ -298,8 +359,13 @@ export async function removeCachedSavingByServerId(id: string): Promise<void> {
 export async function rebuildExpensesCacheFromServer(expenses: Expense[]): Promise<void> {
     const db = await openDB();
     try {
+        const pendingQueue = (await getPendingSyncItems())
+            .filter((item) => item.type === 'expense' && item.action === 'add')
+            .map((item) => item.data as Expense);
+
         const pending = (await getAllFromStore<any>(STORES.EXPENSES))
-            .filter((e: any) => e._pending || e.synced === false);
+            .filter((e: any) => e._pending || e.synced === false)
+            .filter((e: any) => pendingQueue.some((q) => sameExpenseShape(q, e)));
         const pendingIds = new Set<string>(pending.map((e: any) => e._id).filter(Boolean));
 
         await new Promise<void>((resolve, reject) => {
@@ -330,8 +396,13 @@ export async function rebuildExpensesCacheFromServer(expenses: Expense[]): Promi
 export async function rebuildSavingsCacheFromServer(savings: Saving[]): Promise<void> {
     const db = await openDB();
     try {
+        const pendingQueue = (await getPendingSyncItems())
+            .filter((item) => item.type === 'saving' && item.action === 'add')
+            .map((item) => item.data as Saving);
+
         const pending = (await getAllFromStore<any>(STORES.SAVINGS))
-            .filter((s: any) => s._pending || s.synced === false);
+            .filter((s: any) => s._pending || s.synced === false)
+            .filter((s: any) => pendingQueue.some((q) => sameSavingShape(q, s)));
         const pendingIds = new Set<string>(pending.map((s: any) => s._id).filter(Boolean));
 
         await new Promise<void>((resolve, reject) => {
