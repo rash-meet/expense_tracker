@@ -380,6 +380,7 @@ export async function rebuildExpensesCacheFromServer(expenses: Expense[]): Promi
 
             for (const expense of expenses) {
                 if (!expense._id) continue;
+                if (!isCurrentMonthDate(expense.date)) continue;
                 if (pendingIds.has(expense._id)) continue; // Keep pending local edits
                 store.add({ ...expense, synced: true });
             }
@@ -417,6 +418,7 @@ export async function rebuildSavingsCacheFromServer(savings: Saving[]): Promise<
 
             for (const saving of savings) {
                 if (!saving._id) continue;
+                if (!isCurrentMonthDate(saving.date)) continue;
                 if (pendingIds.has(saving._id)) continue; // Keep pending local edits
                 store.add({ ...saving, synced: true });
             }
@@ -446,6 +448,7 @@ export async function cacheExpenses(expenses: Expense[]): Promise<void> {
         for (const expense of expenses) {
             const serverId = expense._id;
             if (!serverId) continue;
+            if (!isCurrentMonthDate(expense.date)) continue;
 
             await new Promise<void>((resolve, reject) => {
                 const tx = db.transaction(STORES.EXPENSES, 'readwrite');
@@ -498,6 +501,7 @@ export async function cacheSavings(savings: Saving[]): Promise<void> {
         for (const saving of savings) {
             const serverId = saving._id;
             if (!serverId) continue;
+            if (!isCurrentMonthDate(saving.date)) continue;
 
             await new Promise<void>((resolve, reject) => {
                 const tx = db.transaction(STORES.SAVINGS, 'readwrite');
@@ -629,6 +633,11 @@ function getCurrentMonthKey(): string {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function isCurrentMonthDate(dateValue?: string): boolean {
+    if (!dateValue || dateValue.length < 7) return false;
+    return dateValue.substring(0, 7) === getCurrentMonthKey();
+}
+
 // Get stored month from metadata
 async function getStoredMonth(): Promise<string | null> {
     try {
@@ -674,6 +683,7 @@ export async function checkAndClearOldMonthData(): Promise<boolean> {
             await clearStore(STORES.EXPENSES);
             await clearStore(STORES.SAVINGS);
             await clearStore(STORES.SYNC_QUEUE);
+            await clearStore(STORES.MONTHLY_TOTALS);
             await setStoredMonth(currentMonth);
             return true; // Data was cleared
         }

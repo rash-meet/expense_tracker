@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getSavings, deleteSaving, checkHealth, getStats, getSettings } from '@/lib/api';
-import { getCachedSavings, cacheSavings, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedSavingByServerId, rebuildSavingsCacheFromServer, cleanupInvalidCachedRows } from '@/lib/offline';
+import { getCachedSavingsForCurrentMonth, cacheSavings, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedSavingByServerId, rebuildSavingsCacheFromServer, cleanupInvalidCachedRows, checkAndClearOldMonthData } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Saving } from '@/types';
 
@@ -54,6 +54,8 @@ export default function SavingReportPage() {
 
         const initializeData = async () => {
             try {
+                await checkAndClearOldMonthData();
+
                 // Load cached monthly totals
                 const cachedTotals = await getCachedMonthlyTotals();
                 if (cachedTotals) {
@@ -69,7 +71,7 @@ export default function SavingReportPage() {
                 } catch { /* use loaded data for dropdowns */ }
                 await cleanupInvalidCachedRows();
 
-                const cached = await getCachedSavings();
+                const cached = await getCachedSavingsForCurrentMonth();
                 if (cached.length > 0) {
                     setSavings(cached);
                     setFilteredSavings(cached);
@@ -106,7 +108,7 @@ export default function SavingReportPage() {
             }
 
             await rebuildSavingsCacheFromServer(all);
-            const updatedCache = await getCachedSavings();
+            const updatedCache = await getCachedSavingsForCurrentMonth();
             setSavings(updatedCache);
             setFilteredSavings(updatedCache);
             setTotalFiltered(updatedCache.reduce((sum, s) => sum + s.amount, 0));
@@ -118,7 +120,7 @@ export default function SavingReportPage() {
 
     const loadCachedData = async () => {
         try {
-            const data = await getCachedSavings();
+            const data = await getCachedSavingsForCurrentMonth();
             setSavings(data);
             setFilteredSavings(data);
             setHasMore(false);
@@ -141,11 +143,11 @@ export default function SavingReportPage() {
             setIsOnline(true);
 
             if (response.data && response.data.length > 0) {
-                const cached = await getCachedSavings();
+                const cached = await getCachedSavingsForCurrentMonth();
                 const pendingOnly = cached.filter(s => s._pending);
 
                 await cacheSavings(response.data);
-                const updatedCache = await getCachedSavings();
+                const updatedCache = await getCachedSavingsForCurrentMonth();
 
                 setSavings(updatedCache);
                 setFilteredSavings(updatedCache);
@@ -312,7 +314,7 @@ export default function SavingReportPage() {
             if (result) {
                 await updateLocalMonthlyTotals(-result.amount, 'saving');
             }
-            const cached = await getCachedSavings();
+            const cached = await getCachedSavingsForCurrentMonth();
             setSavings(cached);
             setFilteredSavings(cached);
             setTotalFiltered(cached.reduce((sum, s) => sum + s.amount, 0));
@@ -359,7 +361,7 @@ export default function SavingReportPage() {
                 }
             }
             setEditingPendingId(null);
-            const cached = await getCachedSavings();
+            const cached = await getCachedSavingsForCurrentMonth();
             setSavings(cached);
             setFilteredSavings(cached);
             setTotalFiltered(cached.reduce((sum, s) => sum + s.amount, 0));

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth';
 import { getExpenses, deleteExpense, checkHealth, getStats, getSettings } from '@/lib/api';
-import { getCachedExpenses, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedExpenseByServerId, rebuildExpensesCacheFromServer, cleanupInvalidCachedRows } from '@/lib/offline';
+import { getCachedExpensesForCurrentMonth, cacheExpenses, checkAndClearOldMonthData, cacheMonthlyTotals, getCachedMonthlyTotals, getPendingSyncItems, deletePendingItem, updatePendingOfflineEntry, updateLocalMonthlyTotals, removeCachedExpenseByServerId, rebuildExpensesCacheFromServer, cleanupInvalidCachedRows } from '@/lib/offline';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import { Expense, SyncQueueItem } from '@/types';
 
@@ -59,6 +59,8 @@ export default function ExpenseReportPage() {
 
         const initializeData = async () => {
             try {
+                await checkAndClearOldMonthData();
+
                 // Load cached monthly totals
                 const cachedTotals = await getCachedMonthlyTotals();
                 if (cachedTotals) {
@@ -80,7 +82,7 @@ export default function ExpenseReportPage() {
                     }
                 } catch { /* use loaded data for dropdowns */ }
 
-                const cached = await getCachedExpenses();
+                const cached = await getCachedExpensesForCurrentMonth();
                 if (cached.length > 0) {
                     setExpenses(cached);
                     setFilteredExpenses(cached);
@@ -128,7 +130,7 @@ export default function ExpenseReportPage() {
             }
 
             await rebuildExpensesCacheFromServer(all);
-            const updatedCache = await getCachedExpenses();
+            const updatedCache = await getCachedExpensesForCurrentMonth();
             setExpenses(updatedCache);
             setFilteredExpenses(updatedCache);
             setTotalFiltered(updatedCache.reduce((sum, e) => sum + e.amount, 0));
@@ -140,7 +142,7 @@ export default function ExpenseReportPage() {
 
     const loadCachedData = async () => {
         try {
-            const data = await getCachedExpenses();
+            const data = await getCachedExpensesForCurrentMonth();
             setExpenses(data);
             setFilteredExpenses(data);
             setHasMore(false);
@@ -165,7 +167,7 @@ export default function ExpenseReportPage() {
 
             if (response.data && response.data.length > 0) {
                 // Add pending items from cache
-                const cached = await getCachedExpenses();
+                const cached = await getCachedExpensesForCurrentMonth();
                 const pendingOnly = cached.filter(e => e._pending);
 
                 // Merge strategies:
@@ -176,7 +178,7 @@ export default function ExpenseReportPage() {
                 // So we should re-read the FULL cache to update the UI consistently.
 
                 await cacheExpenses(response.data); // Update cache first
-                const updatedCache = await getCachedExpenses(); // Read back full source of truth
+                const updatedCache = await getCachedExpensesForCurrentMonth(); // Read back full source of truth
 
                 setExpenses(updatedCache);
                 setFilteredExpenses(updatedCache);
@@ -354,7 +356,7 @@ export default function ExpenseReportPage() {
                 await updateLocalMonthlyTotals(-result.amount, 'expense');
             }
             // Refresh data
-            const cached = await getCachedExpenses();
+            const cached = await getCachedExpensesForCurrentMonth();
             setExpenses(cached);
             setFilteredExpenses(cached);
             setTotalFiltered(cached.reduce((sum, e) => sum + e.amount, 0));
@@ -407,7 +409,7 @@ export default function ExpenseReportPage() {
             }
             setEditingPendingId(null);
             // Refresh data
-            const cached = await getCachedExpenses();
+            const cached = await getCachedExpensesForCurrentMonth();
             setExpenses(cached);
             setFilteredExpenses(cached);
             setTotalFiltered(cached.reduce((sum, e) => sum + e.amount, 0));
