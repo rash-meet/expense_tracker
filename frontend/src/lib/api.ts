@@ -129,6 +129,10 @@ export async function getExpenses(page: number = 1, limit: number = 50, filters:
 
     const response = await apiRequest<any>(`/api/expenses?${params.toString()}`);
 
+    if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch expenses');
+    }
+
     if (response.success && response.data) {
         // Handle backend returning { data: [], pagination: {} }
         // apiRequest generic T maps to response.data if it matches?
@@ -180,6 +184,10 @@ export async function getSavings(page: number = 1, limit: number = 50, filters: 
     });
 
     const response = await apiRequest<any>(`/api/savings?${params.toString()}`);
+
+    if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch savings');
+    }
 
     if (response.success && response.data) {
         return {
