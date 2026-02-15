@@ -30,7 +30,7 @@ export default function SavingReportPage() {
 
     // Pagination State
     const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(true);
+    const [hasMore, setHasMore] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
 
     // Filters
@@ -66,11 +66,6 @@ export default function SavingReportPage() {
                     setHasPending(cachedTotals.hasPending || false);
                 }
 
-                // Try to load settings for dropdowns
-                try {
-                    const settings = await getSettings();
-                    if (settings?.saving_modes?.length) setSavingModes(settings.saving_modes);
-                } catch { /* use loaded data for dropdowns */ }
                 await cleanupInvalidCachedRows();
 
                 const cached = await getCachedSavingsForCurrentMonth();
@@ -78,11 +73,17 @@ export default function SavingReportPage() {
                     setSavings(cached);
                     setFilteredSavings(cached);
                     setTotalFiltered(cached.reduce((sum, s) => sum + s.amount, 0));
-                    setLoading(false);
                     loadDataInBackground(1);
                 } else {
                     await loadData(1, true);
                 }
+
+                // Fetch settings in background; never block report rendering.
+                getSettings()
+                    .then((settings) => {
+                        if (settings?.saving_modes?.length) setSavingModes(settings.saving_modes);
+                    })
+                    .catch(() => { });
             } catch {
                 await loadCachedData();
             } finally {

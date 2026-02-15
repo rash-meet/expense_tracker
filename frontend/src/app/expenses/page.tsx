@@ -30,7 +30,7 @@ export default function ExpenseReportPage() {
 
     // Pagination State
     const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(true);
+    const [hasMore, setHasMore] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
 
     // Filters
@@ -75,25 +75,25 @@ export default function ExpenseReportPage() {
                 await refreshPendingMap();
                 await cleanupInvalidCachedRows();
 
-                // Try to load settings for dropdowns
-                try {
-                    const settings = await getSettings();
-                    if (settings) {
-                        if (settings.categories?.length) setCategories(settings.categories);
-                        if (settings.payment_modes?.length) setPaymentModes(settings.payment_modes);
-                    }
-                } catch { /* use loaded data for dropdowns */ }
-
+                // Load cached report rows first so offline UI is immediate.
                 const cached = await getCachedExpensesForCurrentMonth();
                 if (cached.length > 0) {
                     setExpenses(cached);
                     setFilteredExpenses(cached);
                     setTotalFiltered(cached.reduce((sum, e) => sum + e.amount, 0));
-                    setLoading(false);
                     loadDataInBackground(1);
                 } else {
                     await loadData(1, true);
                 }
+
+                // Fetch settings in background; never block report rendering.
+                getSettings()
+                    .then((settings) => {
+                        if (!settings) return;
+                        if (settings.categories?.length) setCategories(settings.categories);
+                        if (settings.payment_modes?.length) setPaymentModes(settings.payment_modes);
+                    })
+                    .catch(() => { });
             } catch {
                 await loadCachedData();
             } finally {
