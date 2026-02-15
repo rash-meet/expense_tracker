@@ -53,29 +53,34 @@ export default function SavingReportPage() {
         if (!isAuthenticated) return;
 
         const initializeData = async () => {
-            // Load cached monthly totals
-            const cachedTotals = await getCachedMonthlyTotals();
-            if (cachedTotals) {
-                setTotalSaved(cachedTotals.monthSavings);
-                setCurrentMonth(cachedTotals.currentMonth);
-                setHasPending(cachedTotals.hasPending || false);
-            }
-
-            // Try to load settings for dropdowns
             try {
-                const settings = await getSettings();
-                if (settings?.saving_modes?.length) setSavingModes(settings.saving_modes);
-            } catch { /* use loaded data for dropdowns */ }
+                // Load cached monthly totals
+                const cachedTotals = await getCachedMonthlyTotals();
+                if (cachedTotals) {
+                    setTotalSaved(cachedTotals.monthSavings);
+                    setCurrentMonth(cachedTotals.currentMonth);
+                    setHasPending(cachedTotals.hasPending || false);
+                }
 
-            const cached = await getCachedSavings();
-            if (cached.length > 0) {
-                setSavings(cached);
-                setFilteredSavings(cached);
-                setTotalFiltered(cached.reduce((sum, s) => sum + s.amount, 0));
+                // Try to load settings for dropdowns
+                try {
+                    const settings = await getSettings();
+                    if (settings?.saving_modes?.length) setSavingModes(settings.saving_modes);
+                } catch { /* use loaded data for dropdowns */ }
+
+                const cached = await getCachedSavings();
+                if (cached.length > 0) {
+                    setSavings(cached);
+                    setFilteredSavings(cached);
+                    setTotalFiltered(cached.reduce((sum, s) => sum + s.amount, 0));
+                    setLoading(false);
+                    loadDataInBackground(1);
+                } else {
+                    await loadData(1, true);
+                }
+            } catch {
+                await loadCachedData();
                 setLoading(false);
-                loadDataInBackground(1);
-            } else {
-                loadData(1, true);
             }
         };
         initializeData();
@@ -110,11 +115,29 @@ export default function SavingReportPage() {
         }
     };
 
+    const loadCachedData = async () => {
+        try {
+            const data = await getCachedSavings();
+            setSavings(data);
+            setFilteredSavings(data);
+            setHasMore(false);
+            setTotalFiltered(data.reduce((sum, s) => sum + s.amount, 0));
+            setIsOnline(false);
+        } catch {
+            setSavings([]);
+            setFilteredSavings([]);
+            setHasMore(false);
+            setTotalFiltered(0);
+            setIsOnline(false);
+        }
+    };
+
     // Background loading - doesn't show spinner
     const loadDataInBackground = async (pageNum: number) => {
         try {
             const filters: any = {};
             const response = await getSavings(pageNum, 50, filters);
+            setIsOnline(true);
 
             if (response.data && response.data.length > 0) {
                 const cached = await getCachedSavings();
@@ -128,8 +151,6 @@ export default function SavingReportPage() {
                 setTotalFiltered(updatedCache.reduce((sum, s) => sum + s.amount, 0));
                 setHasMore(pageNum < response.pagination.pages);
                 setPage(pageNum);
-                cacheSavings(response.data);
-                setIsOnline(true);
 
                 const stats = await getStats();
                 if (stats) {
@@ -140,10 +161,12 @@ export default function SavingReportPage() {
                     const allModes = [...new Set([...savingModes, ...(stats.saving_modes || [])])];
                     if (allModes.length > 0) setSavingModes(allModes);
                 }
+            } else {
+                setHasMore(false);
+            }
 
-                if (pageNum === 1) {
-                    syncFullCacheFromServer();
-                }
+            if (pageNum === 1) {
+                syncFullCacheFromServer();
             }
         } catch {
             setIsOnline(false);
@@ -157,72 +180,72 @@ export default function SavingReportPage() {
             setLoadingMore(true);
         }
 
-        const healthy = await checkHealth();
-        setIsOnline(healthy);
+        try {
+            const healthy = await checkHealth();
+            setIsOnline(healthy);
 
-        if (healthy) {
-            const filters: any = {};
-            if (fromDate) filters.from_date = fromDate;
-            if (toDate) filters.to_date = toDate;
-            if (modeFilter) filters.saving_mode = modeFilter;
-            if (monthFilter) {
-                const monthNum = MONTHS.indexOf(monthFilter);
-                const year = yearFilter ? parseInt(yearFilter) : currentYear;
-                const start = new Date(year, monthNum, 1);
-                const end = new Date(year, monthNum + 1, 0);
-                filters.from_date = start.toISOString().split('T')[0];
-                filters.to_date = end.toISOString().split('T')[0];
-            }
-
-            const response = await getSavings(pageNum, 50, filters);
-
-            if (isReset) {
-                setSavings(response.data);
-                setFilteredSavings(response.data);
-                const stats = await getStats();
-                if (stats) {
-                    setTotalSaved(stats.month_savings);
-                    setCurrentMonth(stats.current_month);
-                    setHasPending(false);
-                    await cacheMonthlyTotals(stats);
-                    const allModes = [...new Set([...savingModes, ...(stats.saving_modes || [])])];
-                    if (allModes.length > 0) setSavingModes(allModes);
+            if (healthy) {
+                const filters: any = {};
+                if (fromDate) filters.from_date = fromDate;
+                if (toDate) filters.to_date = toDate;
+                if (modeFilter) filters.saving_mode = modeFilter;
+                if (monthFilter) {
+                    const monthNum = MONTHS.indexOf(monthFilter);
+                    const year = yearFilter ? parseInt(yearFilter) : currentYear;
+                    const start = new Date(year, monthNum, 1);
+                    const end = new Date(year, monthNum + 1, 0);
+                    filters.from_date = start.toISOString().split('T')[0];
+                    filters.to_date = end.toISOString().split('T')[0];
                 }
+
+                const response = await getSavings(pageNum, 50, filters);
+
+                if (isReset) {
+                    setSavings(response.data);
+                    setFilteredSavings(response.data);
+                    const stats = await getStats();
+                    if (stats) {
+                        setTotalSaved(stats.month_savings);
+                        setCurrentMonth(stats.current_month);
+                        setHasPending(false);
+                        await cacheMonthlyTotals(stats);
+                        const allModes = [...new Set([...savingModes, ...(stats.saving_modes || [])])];
+                        if (allModes.length > 0) setSavingModes(allModes);
+                    }
+                } else {
+                    setSavings(prev => {
+                        const newItems = response.data.filter(newItem =>
+                            !prev.some(existing => existing._id === newItem._id)
+                        );
+                        return [...prev, ...newItems];
+                    });
+                    setFilteredSavings(prev => {
+                        const newItems = response.data.filter(newItem =>
+                            !prev.some(existing => existing._id === newItem._id)
+                        );
+                        return [...prev, ...newItems];
+                    });
+                }
+
+                setHasMore(pageNum < response.pagination.pages);
+                setPage(pageNum);
+
+                if (isReset) {
+                    await cacheSavings(response.data);
+                    syncFullCacheFromServer();
+                }
+
+                const allLoaded = isReset ? response.data : [...savings, ...response.data];
+                setTotalFiltered(allLoaded.reduce((sum, s) => sum + s.amount, 0));
             } else {
-                setSavings(prev => {
-                    const newItems = response.data.filter(newItem =>
-                        !prev.some(existing => existing._id === newItem._id)
-                    );
-                    return [...prev, ...newItems];
-                });
-                setFilteredSavings(prev => {
-                    const newItems = response.data.filter(newItem =>
-                        !prev.some(existing => existing._id === newItem._id)
-                    );
-                    return [...prev, ...newItems];
-                });
+                await loadCachedData();
             }
-
-            setHasMore(pageNum < response.pagination.pages);
-            setPage(pageNum);
-
-            if (isReset) {
-                cacheSavings(response.data);
-            }
-
-            const allLoaded = isReset ? response.data : [...savings, ...response.data];
-            setTotalFiltered(allLoaded.reduce((sum, s) => sum + s.amount, 0));
-
-        } else {
-            const data = await getCachedSavings();
-            setSavings(data);
-            setFilteredSavings(data);
-            setHasMore(false);
-            setTotalFiltered(data.reduce((sum, s) => sum + s.amount, 0));
+        } catch {
+            await loadCachedData();
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
         }
-
-        setLoading(false);
-        setLoadingMore(false);
     };
 
     const handleLoadMore = () => {

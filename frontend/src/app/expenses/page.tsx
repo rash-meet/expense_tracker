@@ -59,35 +59,40 @@ export default function ExpenseReportPage() {
         if (!isAuthenticated) return;
 
         const initializeData = async () => {
-            // Load cached monthly totals
-            const cachedTotals = await getCachedMonthlyTotals();
-            if (cachedTotals) {
-                setCurrentMonth(cachedTotals.currentMonth);
-                setCurrentMonthTotal(cachedTotals.monthExpenses);
-                setHasPending(cachedTotals.hasPending || false);
-            }
-
-            // Load pending sync map
-            await refreshPendingMap();
-
-            // Try to load settings for dropdowns
             try {
-                const settings = await getSettings();
-                if (settings) {
-                    if (settings.categories?.length) setCategories(settings.categories);
-                    if (settings.payment_modes?.length) setPaymentModes(settings.payment_modes);
+                // Load cached monthly totals
+                const cachedTotals = await getCachedMonthlyTotals();
+                if (cachedTotals) {
+                    setCurrentMonth(cachedTotals.currentMonth);
+                    setCurrentMonthTotal(cachedTotals.monthExpenses);
+                    setHasPending(cachedTotals.hasPending || false);
                 }
-            } catch { /* use loaded data for dropdowns */ }
 
-            const cached = await getCachedExpenses();
-            if (cached.length > 0) {
-                setExpenses(cached);
-                setFilteredExpenses(cached);
-                setTotalFiltered(cached.reduce((sum, e) => sum + e.amount, 0));
+                // Load pending sync map
+                await refreshPendingMap();
+
+                // Try to load settings for dropdowns
+                try {
+                    const settings = await getSettings();
+                    if (settings) {
+                        if (settings.categories?.length) setCategories(settings.categories);
+                        if (settings.payment_modes?.length) setPaymentModes(settings.payment_modes);
+                    }
+                } catch { /* use loaded data for dropdowns */ }
+
+                const cached = await getCachedExpenses();
+                if (cached.length > 0) {
+                    setExpenses(cached);
+                    setFilteredExpenses(cached);
+                    setTotalFiltered(cached.reduce((sum, e) => sum + e.amount, 0));
+                    setLoading(false);
+                    loadDataInBackground(1);
+                } else {
+                    await loadData(1, true);
+                }
+            } catch {
+                await loadCachedData();
                 setLoading(false);
-                loadDataInBackground(1);
-            } else {
-                loadData(1, true);
             }
         };
         initializeData();
@@ -133,11 +138,30 @@ export default function ExpenseReportPage() {
         }
     };
 
+    const loadCachedData = async () => {
+        try {
+            const data = await getCachedExpenses();
+            setExpenses(data);
+            setFilteredExpenses(data);
+            setHasMore(false);
+            setCurrentMonth(MONTHS[new Date().getMonth()]);
+            setTotalFiltered(data.reduce((sum, e) => sum + e.amount, 0));
+            setIsOnline(false);
+        } catch {
+            setExpenses([]);
+            setFilteredExpenses([]);
+            setHasMore(false);
+            setTotalFiltered(0);
+            setIsOnline(false);
+        }
+    };
+
     // Background loading - doesn't show spinner
     const loadDataInBackground = async (pageNum: number) => {
         try {
             const filters: any = {};
             const response = await getExpenses(pageNum, 50, filters);
+            setIsOnline(true);
 
             if (response.data && response.data.length > 0) {
                 // Add pending items from cache
@@ -159,8 +183,6 @@ export default function ExpenseReportPage() {
                 setTotalFiltered(updatedCache.reduce((sum, e) => sum + e.amount, 0));
                 setHasMore(pageNum < response.pagination.pages);
                 setPage(pageNum);
-                cacheExpenses(response.data);
-                setIsOnline(true);
 
                 const stats = await getStats();
                 if (stats) {
@@ -174,10 +196,12 @@ export default function ExpenseReportPage() {
                     if (allCats.length > 0) setCategories(allCats);
                     if (allModes.length > 0) setPaymentModes(allModes);
                 }
+            } else {
+                setHasMore(false);
+            }
 
-                if (pageNum === 1) {
-                    syncFullCacheFromServer();
-                }
+            if (pageNum === 1) {
+                syncFullCacheFromServer();
             }
         } catch {
             setIsOnline(false);
@@ -191,76 +215,75 @@ export default function ExpenseReportPage() {
             setLoadingMore(true);
         }
 
-        const healthy = await checkHealth();
-        setIsOnline(healthy);
+        try {
+            const healthy = await checkHealth();
+            setIsOnline(healthy);
 
-        if (healthy) {
-            const filters: any = {};
-            if (fromDate) filters.from_date = fromDate;
-            if (toDate) filters.to_date = toDate;
-            if (categoryFilter) filters.category = categoryFilter;
-            if (paymentFilter) filters.payment_mode = paymentFilter;
-            if (monthFilter) {
-                const monthNum = MONTHS.indexOf(monthFilter);
-                const year = yearFilter ? parseInt(yearFilter) : currentYear;
-                const start = new Date(year, monthNum, 1);
-                const end = new Date(year, monthNum + 1, 0);
-                filters.from_date = start.toISOString().split('T')[0];
-                filters.to_date = end.toISOString().split('T')[0];
-            }
-
-            const response = await getExpenses(pageNum, 50, filters);
-
-            if (isReset) {
-                setExpenses(response.data);
-                setFilteredExpenses(response.data);
-                const stats = await getStats();
-                if (stats) {
-                    setCurrentMonth(stats.current_month);
-                    setCurrentMonthTotal(stats.month_expenses);
-                    // Merge categories from stats
-                    const allCats = [...new Set([...categories, ...(stats.categories || [])])];
-                    const allModes = [...new Set([...paymentModes, ...(stats.payment_modes || [])])];
-                    if (allCats.length > 0) setCategories(allCats);
-                    if (allModes.length > 0) setPaymentModes(allModes);
+            if (healthy) {
+                const filters: any = {};
+                if (fromDate) filters.from_date = fromDate;
+                if (toDate) filters.to_date = toDate;
+                if (categoryFilter) filters.category = categoryFilter;
+                if (paymentFilter) filters.payment_mode = paymentFilter;
+                if (monthFilter) {
+                    const monthNum = MONTHS.indexOf(monthFilter);
+                    const year = yearFilter ? parseInt(yearFilter) : currentYear;
+                    const start = new Date(year, monthNum, 1);
+                    const end = new Date(year, monthNum + 1, 0);
+                    filters.from_date = start.toISOString().split('T')[0];
+                    filters.to_date = end.toISOString().split('T')[0];
                 }
+
+                const response = await getExpenses(pageNum, 50, filters);
+
+                if (isReset) {
+                    setExpenses(response.data);
+                    setFilteredExpenses(response.data);
+                    const stats = await getStats();
+                    if (stats) {
+                        setCurrentMonth(stats.current_month);
+                        setCurrentMonthTotal(stats.month_expenses);
+                        // Merge categories from stats
+                        const allCats = [...new Set([...categories, ...(stats.categories || [])])];
+                        const allModes = [...new Set([...paymentModes, ...(stats.payment_modes || [])])];
+                        if (allCats.length > 0) setCategories(allCats);
+                        if (allModes.length > 0) setPaymentModes(allModes);
+                    }
+                } else {
+                    setExpenses(prev => {
+                        const newItems = response.data.filter(newItem =>
+                            !prev.some(existing => existing._id === newItem._id)
+                        );
+                        return [...prev, ...newItems];
+                    });
+
+                    setFilteredExpenses(prev => {
+                        const newItems = response.data.filter(newItem =>
+                            !prev.some(existing => existing._id === newItem._id)
+                        );
+                        return [...prev, ...newItems];
+                    });
+                }
+
+                setHasMore(pageNum < response.pagination.pages);
+                setPage(pageNum);
+
+                if (isReset) {
+                    await cacheExpenses(response.data);
+                    syncFullCacheFromServer();
+                }
+
+                const allLoaded = isReset ? response.data : [...expenses, ...response.data];
+                setTotalFiltered(allLoaded.reduce((sum, e) => sum + e.amount, 0));
             } else {
-                setExpenses(prev => {
-                    const newItems = response.data.filter(newItem =>
-                        !prev.some(existing => existing._id === newItem._id)
-                    );
-                    return [...prev, ...newItems];
-                });
-
-                setFilteredExpenses(prev => {
-                    const newItems = response.data.filter(newItem =>
-                        !prev.some(existing => existing._id === newItem._id)
-                    );
-                    return [...prev, ...newItems];
-                });
+                await loadCachedData();
             }
-
-            setHasMore(pageNum < response.pagination.pages);
-            setPage(pageNum);
-
-            if (isReset) {
-                cacheExpenses(response.data);
-            }
-
-            const allLoaded = isReset ? response.data : [...expenses, ...response.data];
-            setTotalFiltered(allLoaded.reduce((sum, e) => sum + e.amount, 0));
-
-        } else {
-            const data = await getCachedExpenses();
-            setExpenses(data);
-            setFilteredExpenses(data);
-            setHasMore(false);
-            setCurrentMonth(MONTHS[new Date().getMonth()]);
-            setTotalFiltered(data.reduce((sum, e) => sum + e.amount, 0));
+        } catch {
+            await loadCachedData();
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
         }
-
-        setLoading(false);
-        setLoadingMore(false);
     };
 
     const handleLoadMore = () => {
