@@ -167,7 +167,7 @@ export default function SavingReportPage() {
             }
 
             if (pageNum === 1) {
-                syncFullCacheFromServer();
+                await syncFullCacheFromServer();
             }
         } catch {
             setIsOnline(false);
@@ -233,7 +233,7 @@ export default function SavingReportPage() {
 
                 if (isReset) {
                     await cacheSavings(response.data);
-                    syncFullCacheFromServer();
+                    await syncFullCacheFromServer();
                 }
 
                 const allLoaded = isReset ? response.data : [...savings, ...response.data];

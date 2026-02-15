@@ -201,7 +201,7 @@ export default function ExpenseReportPage() {
             }
 
             if (pageNum === 1) {
-                syncFullCacheFromServer();
+                await syncFullCacheFromServer();
             }
         } catch {
             setIsOnline(false);
@@ -270,7 +270,7 @@ export default function ExpenseReportPage() {
 
                 if (isReset) {
                     await cacheExpenses(response.data);
-                    syncFullCacheFromServer();
+                    await syncFullCacheFromServer();
                 }
 
                 const allLoaded = isReset ? response.data : [...expenses, ...response.data];

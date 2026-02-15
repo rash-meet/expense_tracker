@@ -552,8 +552,12 @@ export async function getCachedExpenses(): Promise<Expense[]> {
         _pending: e._pending || e.synced === false,
     }));
 
-    // Sort by date desc, then time desc, then id desc
+    // Keep unsynced/pending rows at top, then sort by date/time/id desc.
     return mapped.sort((a: any, b: any) => {
+        const pendingA = a._pending ? 1 : 0;
+        const pendingB = b._pending ? 1 : 0;
+        if (pendingA !== pendingB) return pendingB - pendingA;
+
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
         if (dateA !== dateB) return dateB - dateA;
@@ -575,8 +579,12 @@ export async function getCachedSavings(): Promise<Saving[]> {
         _pending: e._pending || e.synced === false,
     }));
 
-    // Sort by date desc, then time desc, then id desc
+    // Keep unsynced/pending rows at top, then sort by date/time/id desc.
     return mapped.sort((a: any, b: any) => {
+        const pendingA = a._pending ? 1 : 0;
+        const pendingB = b._pending ? 1 : 0;
+        if (pendingA !== pendingB) return pendingB - pendingA;
+
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
         if (dateA !== dateB) return dateB - dateA;
