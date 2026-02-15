@@ -26,6 +26,7 @@ export default function SavingReportPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [hasPending, setHasPending] = useState(false);
     const fullSyncDoneRef = useRef(false);
+    const initGuardRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Pagination State
     const [page, setPage] = useState(1);
@@ -51,6 +52,7 @@ export default function SavingReportPage() {
 
     useEffect(() => {
         if (!isAuthenticated) return;
+        initGuardRef.current = setTimeout(() => setLoading(false), 8000);
 
         const initializeData = async () => {
             try {
@@ -84,10 +86,21 @@ export default function SavingReportPage() {
             } catch {
                 await loadCachedData();
             } finally {
+                if (initGuardRef.current) {
+                    clearTimeout(initGuardRef.current);
+                    initGuardRef.current = null;
+                }
                 setLoading(false);
             }
         };
         initializeData();
+
+        return () => {
+            if (initGuardRef.current) {
+                clearTimeout(initGuardRef.current);
+                initGuardRef.current = null;
+            }
+        };
     }, [isAuthenticated]);
 
     const syncFullCacheFromServer = async () => {
